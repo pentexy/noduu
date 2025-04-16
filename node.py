@@ -2,44 +2,39 @@ from pyrogram import Client, filters
 from pyrogram.types import Message
 import asyncio
 
-API_ID = 26416419  # replace with your API ID
-API_HASH = "c109c77f5823c847b1aeb7fbd4990cc4"  # replace with your API hash
-BOT_TOKEN = "6400675462:AAFlUPT3-RlVZ33MCqduP_6MaaSsx00e5Ak"  # replace with your bot token
+api_id = 21715362  # Your API ID from my.telegram.org
+api_hash = "e9ee23b30cffbb5081c6318c3a555f5d"  # Your API hash from my.telegram.org
+bot_token = "6400675462:AAFlUPT3-RlVZ33MCqduP_6MaaSsx00e5Ak"  # Your bot token from @BotFather
+session_string = "BQFLWaIALVM4xN8QwHBFT-3adIY_viNV97B7vdfRy1GAeL6dWboR4YibYl1k1hHGaAJpjHuw26Dr2BjBtf7Gvgc15cGziWWnCEGPcpH4448i7yTZFg5SvOsm0F-Sf8c7boFhcnHhPHcmlG6qGkXeRS90W4vPwmpx1rpxID-QxILSPWYqHUUceUZhjUUPI1aIsTplq_QM70MlfYfVmgivcz_-CjDP3glQI3xxedaMDknNM06WFSDW5eeLDr-z_9bRwOdhY2yFH-eHxrd-LttlRy5WIMBPQo0ojX22i35OBRwzWiaVHrRa2c-TuGdOdto-ksNmB3RTt-1kWEYzm-QzQJmXngp_BwAAAAHJtXFRAA"  # Your session string
 
-FORWARD_COMMANDS = ["/top", "/convert", "/ath", "/crypto", "/ton", "/ltc"]
-GROUP_ID = -1002575253805  # Replace with the correct group ID
+# Initialize the bot and userbot
+bot = Client("bot", bot_token=bot_token)
+userbot = Client("userbot", api_id=api_id, api_hash=api_hash, session_string=session_string)
 
-# Use your provided session string
-user = Client(
-    name="nodes_user",
-    api_id=API_ID,
-    api_hash=API_HASH,
-    session_string="BQFLWaIAJzdQC557pnlTMHJihwctmm0Vu2BQdk-uuiMrxOueke0PMPo6LAN1f-jBBoj9wTRuJMCnWX9vhKmw0myxQYbBrGt1nCEV5wV7qyOCvkYFPUfa_goOiKQ1MoU1rIMvbKWWyVrBMs2OaZToTfJXRCx4m7Gdq9zAeFJq6IWzDAgHWmOkvEOdnb-5pnhounisIFQl1Ar55yowIv5c_mFiqz-p0y24Bmqt8MJsAFOnkm7vnvJ7ZBbmu7rMdO130DDov7ZS78s0_yWf7KL-q01y5qdr5IEerrZSk8f0DgvWd5OAD9-xgujzQ-gAClxvfqRdnCWDH-NaHyA-OPHO26C13mzTKQAAAAGK6vkyAA"
-)
+# Handler for commands received by the bot
+@bot.on_message(filters.command("start"))
+async def start_handler(client, message: Message):
+    await message.reply("Hello! Send a command and I'll forward it to @NodesGGbot.")
 
-bot = Client("nodes_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
+@bot.on_message(filters.text & ~filters.command("start"))
+async def forward_to_nodesggbot(client, message: Message):
+    # Get the text command from the user
+    user_command = message.text
+    
+    # Send the command to @NodesGGbot
+    sent_message = await userbot.send_message("@NodesGGbot", user_command)
+    
+    # Wait for a response from @NodesGGbot
+    @userbot.on_message(filters.chat("NodesGGbot") & filters.reply)
+    async def handle_response(_, bot_msg):
+        if bot_msg.reply_to_message.id == sent_message.id:
+            # Forward the response (text or media) back to the user
+            if bot_msg.text:
+                await message.reply(bot_msg.text)
+            if bot_msg.media:
+                await bot_msg.copy(message.chat.id)
+            return
 
-@bot.on_message(filters.command(FORWARD_COMMANDS) & filters.private)
-async def forward_command(client, message: Message):
-    cmd = message.text
-    user_msg = await message.reply("⏳ Forwarding your command...")
-
-    async with user:
-        try:
-            # Forward the command to the target group
-            forwarded_msg = await user.send_message(GROUP_ID, cmd)
-
-            # Wait for a response in the group, you may need to tweak the timeout as per your needs
-            response = await user.listen(chat_id=GROUP_ID, timeout=10)
-
-            # Forward the response to the user
-            text = response.text or response.caption or "⚠️ No response from group."
-            await user_msg.edit(f"**Group Response:**\n\n{text}")
-
-        except asyncio.TimeoutError:
-            await user_msg.edit("⚠️ No response from group in time.")
-        except Exception as e:
-            await user_msg.edit(f"❌ Error: `{str(e)}`")
-
-user.start()
+# Run the bot and userbot
 bot.run()
+userbot.run()
