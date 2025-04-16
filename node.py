@@ -28,20 +28,27 @@ async def forward_command(client, message: Message):
 
     async with user:
         try:
-            # Make sure chat is accessible
+            # Ensure user session has access to the TARGET_BOT chat
             await user.get_chat(TARGET_BOT)
 
-            # Send command to @NodesGGbot
+            # Send the command to @NodesGGbot
             await user.send_message(TARGET_BOT, cmd)
 
-            # Listen only to private reply from that bot
-            response = await user.listen(filters=filters.private & filters.chat(TARGET_BOT), timeout=10)
+            # Wait for 5 seconds before fetching the most recent message (assuming reply will come in that time)
+            await asyncio.sleep(5)
 
-            text = response.text or response.caption or "⚠️ Empty response"
-            await user_msg.edit(f"**NodeX Response:**\n\n{text}")
+            # Fetch the most recent message from @NodesGGbot
+            history = await user.get_chat_history(TARGET_BOT, limit=1)
+            response = history[0] if history else None
+
+            if response:
+                text = response.text or response.caption or "⚠️ Empty response"
+                await user_msg.edit(f"**NodeX Response:**\n\n{text}")
+            else:
+                await user_msg.edit("⚠️ No response from NodesGGbot.")
 
         except asyncio.TimeoutError:
-            await user_msg.edit("⚠️ No response from NodesGG in time.")
+            await user_msg.edit("⚠️ No response from NodesGGbot in time.")
         except Exception as e:
             await user_msg.edit(f"❌ Error: `{str(e)}`")
 
