@@ -2,8 +2,8 @@ from pyrogram import Client, filters
 from pyrogram.types import Message
 import asyncio
 
-api_id = 21715362  # Your API ID from my.telegram.org
-api_hash = "e9ee23b30cffbb5081c6318c3a555f5d"  # Your API hash from my.telegram.org
+api_id = 26416419  # Your API ID from my.telegram.org
+api_hash = "c109c77f5823c847b1aeb7fbd4990cc4"  # Your API hash from my.telegram.org
 bot_token = "6400675462:AAFlUPT3-RlVZ33MCqduP_6MaaSsx00e5Ak"  # Your bot token from @BotFather
 session_string = "BQFLWaIALVM4xN8QwHBFT-3adIY_viNV97B7vdfRy1GAeL6dWboR4YibYl1k1hHGaAJpjHuw26Dr2BjBtf7Gvgc15cGziWWnCEGPcpH4448i7yTZFg5SvOsm0F-Sf8c7boFhcnHhPHcmlG6qGkXeRS90W4vPwmpx1rpxID-QxILSPWYqHUUceUZhjUUPI1aIsTplq_QM70MlfYfVmgivcz_-CjDP3glQI3xxedaMDknNM06WFSDW5eeLDr-z_9bRwOdhY2yFH-eHxrd-LttlRy5WIMBPQo0ojX22i35OBRwzWiaVHrRa2c-TuGdOdto-ksNmB3RTt-1kWEYzm-QzQJmXngp_BwAAAAHJtXFRAA"  # Your session string
 
