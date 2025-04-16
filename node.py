@@ -1,5 +1,5 @@
 import asyncio
-from pyrogram import Client, filters
+from pyrogram import Client, filters, idle
 from pyrogram.types import Message
 
 # === Config ===
@@ -55,5 +55,4 @@ async def main():
     await userbot.stop()
     await bot.stop()
 
-from pyrogram.idle import idle
 asyncio.run(main())
