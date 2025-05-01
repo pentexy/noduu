@@ -1,7 +1,7 @@
 import requests
 
 BOT_TOKEN = "7841641161:AAGOGBmvkVQECpc5e6xpATEqKmKpF5IW8kU"
-NEW_NAME = "Instagram Hacker"
+NEW_NAME = "Instagram Snapchat ID IG Hacker"
 
 url = f"https://api.telegram.org/bot{BOT_TOKEN}/setMyName"
 payload = {
