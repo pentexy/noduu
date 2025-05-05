@@ -14,8 +14,9 @@ logger = logging.getLogger(__name__)
 
 # === Text constants ===
 WELCOME_TEXT = (
-    "**ʏᴏᴜ ᴀʀᴇ ɴᴏᴡ ɢᴏɪɴɢ ᴛᴏ ᴛᴀʟᴋ ᴛᴏ ⧼ ᴠɪʀᴛᴜᴀʟ ʏᴏʀ ғᴏʀɢᴇʀ ⧽ — ᴍɪɴᴅ ʏᴏᴜʀ ᴡᴏʀᴅs ʙᴇғᴏʀᴇ sᴘᴇᴀᴋɪɴɢ!**\n\n"
-    "⌬ **ᴜsᴇ /pm `off` || `on` ᴛᴏ ᴅɪsᴀʙʟᴇ ⊶ᴏʀ⊷ ᴇɴᴀʙʟᴇ ᴍᴇ.**"
+    "**ʏᴏᴜ ᴀʀᴇ ɴᴏᴡ ɢᴏɪɴɢ ᴛᴏ ᴛᴀʟᴋ ᴛᴏ ⧼ [ᴠɪʀᴛᴜᴀʟ ʏᴏʀ ғᴏʀɢᴇʀ](https://t.me/YorXMusicBot) ⧽ — ᴍɪɴᴅ ʏᴏᴜʀ ᴡᴏʀᴅs ʙᴇғᴏʀᴇ sᴘᴇᴀᴋɪɴɢ!**\n\n"
+    "⌬ **ᴜsᴇ** `/pm off` **||** `/pm on` **ᴛᴏ ᴅɪsᴀʙʟᴇ ⊶ᴏʀ⊷ ᴇɴᴀʙʟᴇ ᴍᴇ.**\n\n"
+    "**ᴍᴀᴅᴇ ᴡɪᴛʜ** [ᴅᴇᴠ](https://t.me/WingedAura)💗"
 )
 
 # === Runtime state ===
@@ -38,12 +39,12 @@ async def handle_user_message(event):
     # Handle PM toggle commands
     if msg_text.lower() == "/pm off":
         pm_enabled[user_id] = False
-        await event.reply("**Virtual Yor PM mode disabled.**")
+        await event.reply("**ᴠɪʀᴛᴜᴀʟ ʏᴏᴜʀ ᴘᴍ ᴍᴏᴅᴇ ɪs ᴄᴜʀʀᴇɴᴛʟʏ ᴅɪsᴀʙʟᴇᴅ !**\n **ᴜsᴇ ➠** `/pm on` **ᴛᴏ ᴇɴᴀʙʟᴇ ɪᴛ ᴀɴʏᴛɪᴍᴇ ☺️**")
         logger.info(f"User {user_id} disabled PM mode.")
         return
     elif msg_text.lower() == "/pm on":
         pm_enabled[user_id] = True
-        await event.reply("**Virtual Yor PM mode enabled.**")
+        await event.reply("**ᴠɪʀᴛᴜᴀʟ ʏᴏᴜʀ ᴘᴍ ᴍᴏᴅᴇ ɪs ᴄᴜʀʀᴇɴᴛʟʏ ᴇɴᴀʙʟᴇᴅ,ᴛᴀʟᴋ ғʀᴇᴇʟʏ 💗 !**")
         logger.info(f"User {user_id} enabled PM mode.")
         return
 
