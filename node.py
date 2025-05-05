@@ -1,52 +1,79 @@
-import openai
-import asyncio
-from telethon import TelegramClient, events
-import random
+from instagrapi import Client
+from datetime import datetime
+import time
+import threading
+import getpass
 
-# === CONFIGURATION ===
-API_ID = 26416419
-API_HASH = "c109c77f5823c847b1aeb7fbd4990cc4"
-SESSION_NAME = "chatgpt_userbot"
+afk_data = {
+    "status": False,
+    "reason": None,
+    "since": None
+}
 
-openai.api_key = "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"  # Replace with your real key
+cl = Client()
+username = input("Enter Instagram Username: ")
+password = getpass.getpass("Enter Password: ")
 
-client = TelegramClient(SESSION_NAME, API_ID, API_HASH)
+try:
+    cl.login(username, password)
+    me = cl.account_info()
+    owner_id = me.pk
+    print("✅ ʟᴏɢɪɴ ꜱᴜᴄᴄᴇꜱꜱꜰᴜʟ.")
+except Exception as e:
+    print(f"❌ ʟᴏɢɪɴ ꜰᴀɪʟᴇᴅ: {e}")
+    exit()
 
-@client.on(events.NewMessage(incoming=True))
-async def chatgpt_reply(event):
-    if not event.is_private:
-        return
+def format_afk_message():
+    elapsed = datetime.now() - afk_data["since"]
+    hours, remainder = divmod(int(elapsed.total_seconds()), 3600)
+    minutes, seconds = divmod(remainder, 60)
+    offline_time = f"{hours}h {minutes}m {seconds}s"
+    return (
+        "ᴍʏ ᴏᴡɴᴇʀ ɪꜱ ᴀꜰᴋ !\n"
+        f"ʀᴇᴀꜱᴏɴ : {afk_data['reason']}\n"
+        f"ᴏꜰꜰʟɪɴᴇ ᴘᴀʀᴀᴍᴇᴛᴇʀ : {offline_time}"
+    )
 
-    if event.media or event.message.message.startswith("/"):
-        return
+def check_and_handle_commands(thread, msg, sender_id):
+    text = msg.text.lower() if msg.text else ""
 
-    message_text = event.message.message.strip()
+    if sender_id == owner_id:
+        if text.startswith("/afk "):
+            afk_data["reason"] = msg.text[5:].strip()
+            afk_data["since"] = datetime.now()
+            afk_data["status"] = True
+            cl.direct_send("ʏᴏᴜ ᴀʀᴇ ɴᴏᴡ ᴀꜰᴋ ! 😾", [thread.id])
+        elif text == "/back":
+            afk_data["status"] = False
+            afk_data["reason"] = None
+            afk_data["since"] = None
+            cl.direct_send("✅ ʏᴏᴜ ᴀʀᴇ ʙᴀᴄᴋ ɴᴏᴡ.", [thread.id])
+    elif afk_data["status"] and not text.startswith("/"):
+        cl.direct_send(format_afk_message(), [sender_id])
 
-    try:
-        # Fix: Get entity for typing simulation
-        entity = await client.get_entity(event.sender_id)
-        async with client.action(entity, 'typing'):
-            await asyncio.sleep(random.uniform(1.0, 2.5))
-    except Exception as e:
-        print(f"[Typing Simulation Error] {e}")
+def handle_messages():
+    print("ʙᴏᴛ ɪꜱ ʀᴜɴɴɪɴɢ. ꜰᴜʟʟ ᴀꜰᴋ ᴄᴏɴᴛʀᴏʟ ᴠɪᴀ ᴅᴍ/ɢʀᴏᴜᴘꜱ.")
+    last_checked = {}
 
-    try:
-        reply = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "user", "content": message_text}
-            ],
-            temperature=0.8,
-        )
+    while True:
+        inbox = cl.direct_threads()
+        for thread in inbox:
+            if thread.id not in last_checked:
+                last_checked[thread.id] = 0
 
-        response_text = reply['choices'][0]['message']['content']
-        await event.reply(response_text)
+            new_messages = [
+                msg for msg in thread.messages
+                if msg.timestamp.timestamp() > last_checked[thread.id]
+            ]
 
-    except Exception as e:
-        print(f"[OpenAI Error] {e}")
-        await event.reply("Something went wrong. Please try again later.")
+            for msg in new_messages:
+                check_and_handle_commands(thread, msg, msg.user_id)
 
-print("Starting Telegram userbot...")
-client.start()
-print("Logged in successfully. Waiting for messages.")
-client.run_until_disconnected()
+            if new_messages:
+                last_checked[thread.id] = max(
+                    msg.timestamp.timestamp() for msg in new_messages
+                )
+
+        time.sleep(10)
+
+handle_messages()
