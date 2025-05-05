@@ -35,8 +35,8 @@ ai_module_on = True
 # **** Startup Message ****
 START_MSG = (
     "**ʏᴏᴜ ᴀʀᴇ ɴᴏᴡ ɢᴏɪɴɢ ᴛᴏ ᴛᴀʟᴋ ᴛᴏ [⧼ ᴠɪʀᴛᴜᴀʟ ʏᴏʀ ғᴏʀɢᴇʀ ⧽](https://t.me/YorXMusicBot)**\n"
-    "**๏ ᴍɪɴᴅ ʏᴏᴜʀ ᴡᴏʀᴅꜱ ʙᴇꜰᴏʀᴇ ꜱᴘᴇᴀᴋɪɴɢ!**\n"
-    "**⌬ ᴜꜱᴇ `/pm on` || `/pm off` ᴛᴏ ⊶ᴇɴᴀʙʟᴇ⊷ ᴏʀ ⊶ᴅɪꜱᴀʙʟᴇ⊷ ᴍᴇ.**\n"
+    "**๏ ᴍɪɴᴅ ʏᴏᴜʀ ᴡᴏʀᴅꜱ ʙᴇꜰᴏʀᴇ ꜱᴘᴇᴀᴋɪɴɢ!**\n\n"
+    "**⌬ ᴜꜱᴇ `/pm on` || `/pm off` ᴛᴏ ⊶ᴇɴᴀʙʟᴇ⊷ ᴏʀ ⊶ᴅɪꜱᴀʙʟᴇ⊷ ᴍᴇ.**\n\n"
     "**➪ ᴍᴀᴅᴇ ᴡɪᴛʜ [ᴅᴇᴠ 💗](https://t.me/WingedAura)**"
 )
 
@@ -53,7 +53,7 @@ async def get_dialog_count():
 
 async def type_and_send(event, message, **kwargs):
     async with client.action(event.chat_id, "typing"):
-        await asyncio.sleep(0.2)  # faster typing
+        await asyncio.sleep(0.2)
         await event.reply(message, **kwargs)
 
 # **** Main Message Handler ****
@@ -66,7 +66,7 @@ async def main_handler(event):
         return
 
     if event.text and event.text.startswith("."):
-        return  # ignore commands
+        return
 
     if maintenance_mode or not ai_module_on or user_flags.get(user_id) == "off":
         return
@@ -107,8 +107,8 @@ async def response_handler(event):
         os.remove(file)
         logger.info(f"Media sent to {user_id}")
 
-# **** Commands ****
-@client.on(events.NewMessage(pattern=r"^.([a-z]+)(?:\s+(.*))?", from_users=lambda u: True))
+# **** Commands Handler (Fixed: removed lambda issue) ****
+@client.on(events.NewMessage(pattern=r"^.([a-z]+)(?:\s+(.*))?", incoming=True))
 async def command_handler(event):
     cmd, arg = event.pattern_match.groups()
     user_id = event.sender_id
