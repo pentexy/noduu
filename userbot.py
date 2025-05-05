@@ -8,115 +8,136 @@ import requests
 from datetime import datetime
 from telethon import TelegramClient, events
 from telethon.tl.functions.messages import GetDialogsRequest
-from telethon.tl.types import InputPeerEmpty
+from telethon.tl.types import InputPeerEmpty, ChatAdminRights
 
-# **** Configuration ****
+# Configuration
 API_ID = 26416419
 API_HASH = "c109c77f5823c847b1aeb7fbd4990cc4"
 SESSION_NAME = "forward_to_nezuko"
 OWNER_ID = 6748827895
 VIRTUAL_BOT = "im_NezukoBot"
 
-# **** Logging ****
+# Logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("bot")
 
-# **** Client Init ****
+# Client Init
 client = TelegramClient(SESSION_NAME, API_ID, API_HASH)
 forward_map = {}
 user_flags = {}
 moderators = set()
 start_time = time.time()
 
-# **** Maintenance Mode ****
+# Flags
 maintenance_mode = False
 ai_module_on = True
 
-# **** Startup Message ****
 START_MSG = (
-    "**ʏᴏᴜ ᴀʀᴇ ɴᴏᴡ ɢᴏɪɴɢ ᴛᴏ ᴛᴀʟᴋ ᴛᴏ [⧼ ᴠɪʀᴛᴜᴀʟ ʏᴏʀ ғᴏʀɢᴇʀ ⧽](https://t.me/YorXMusicBot)**\n"
-    "**๏ ᴍɪɴᴅ ʏᴏᴜʀ ᴡᴏʀᴅꜱ ʙᴇꜰᴏʀᴇ ꜱᴘᴇᴀᴋɪɴɢ!**\n\n"
-    "**⌬ ᴜꜱᴇ `/pm on` || `/pm off` ᴛᴏ ⊶ᴇɴᴀʙʟᴇ⊷ ᴏʀ ⊶ᴅɪꜱᴀʙʟᴇ⊷ ᴍᴇ.**\n\n"
-    "**➪ ᴍᴀᴅᴇ ᴡɪᴛʜ [ᴅᴇᴠ 💗](https://t.me/WingedAura)**"
+    "ʏᴏᴜ ᴀʀᴇ ɴᴏᴡ ᴛᴀʟᴋɪɴɢ ᴛᴏ ⧼ ᴠɪʀᴛᴜᴀʟ ʏᴏʀ ꜰᴏʀɢᴇʀ ⧽\n"
+    "๏ ᴍɪɴᴅ ʏᴏᴜʀ ᴡᴏʀᴅꜱ ʙᴇꜰᴏʀᴇ ꜱᴘᴇᴀᴋɪɴɢ!\n\n"
+    "⌬ ᴜꜱᴇ /pm on || /pm off ᴛᴏ ⊶ᴇɴᴀʙʟᴇ⊷ ᴏʀ ⊶ᴅɪꜱᴀʙʟᴇ⊷ ᴍᴇ.\n\n"
+    "➪ ᴍᴀᴅᴇ ᴡɪᴛʜ ᴅᴇᴠ 💗"
 )
 
-# **** Helper Functions ****
-def is_owner_or_mod(user_id):
-    return user_id == OWNER_ID or user_id in moderators
+UNAUTHORISED_MSG = (
+    "**ꜱᴏʀʀʏ ʏᴏᴜ ᴀʀᴇ ɴᴏᴛ ᴀᴜᴛʜᴏʀɪꜱᴇᴅ ᴛᴏ ᴜꜱᴇ ꜱᴜᴅᴏ ᴄᴏᴍᴍᴀɴᴅꜱ! **
+    ᴘʟᴇᴀꜱᴇ ᴠɪꜱɪᴛ : [ʙᴇᴀᴋᴀᴛꜱᴜᴋɪ.ᴛ.ᴍᴇ](https://t.me/beakatsuki) !**"
+)
+
+# Helper Functions
+def is_owner_or_mod(uid):
+    return uid == OWNER_ID or uid in moderators
 
 def get_uptime():
     return str(datetime.utcnow() - datetime.utcfromtimestamp(start_time)).split('.')[0]
 
-async def get_dialog_count():
-    dialogs = await client(GetDialogsRequest(offset_date=None, offset_id=0, offset_peer=InputPeerEmpty(), limit=100, hash=0))
-    return len(dialogs.chats), len(dialogs.users)
+async def get_dialog_stats():
+    chats = 0
+    users = 0
+    admin_chats = []
+    async for dialog in client.iter_dialogs():
+        if dialog.is_group or dialog.is_channel:
+            chats += 1
+            if dialog.entity.admin_rights:
+                admin_chats.append(dialog.name)
+        elif dialog.is_user:
+            users += 1
+    return chats, users, admin_chats
 
-async def type_and_send(event, message, **kwargs):
-    async with client.action(event.chat_id, "typing"):
+async def type_and_send(event, text):
+    async with client.action(event.chat_id, 'typing'):
         await asyncio.sleep(0.2)
-        await event.reply(message, **kwargs)
+        await event.reply(text, link_preview=False)
 
-# **** Main Message Handler ****
+async def record_and_send(event, file, reply_to):
+    async with client.action(event.chat_id, 'record-audio'):
+        await asyncio.sleep(0.5)
+        await client.send_file(event.chat_id, file, voice_note=True, reply_to=reply_to)
+    os.remove(file)
+
+# Main AI Handler
 @client.on(events.NewMessage(incoming=True))
 async def main_handler(event):
     sender = await event.get_sender()
-    user_id = event.sender_id
-
+    uid = event.sender_id
     if not event.is_private or sender.bot:
         return
-
     if event.text and event.text.startswith("."):
         return
-
-    if maintenance_mode or not ai_module_on or user_flags.get(user_id) == "off":
+    if maintenance_mode or not ai_module_on or user_flags.get(uid) == "off":
         return
-
-    if user_id not in user_flags:
-        user_flags[user_id] = "on"
-        await type_and_send(event, START_MSG, link_preview=False)
-
+    if uid not in user_flags:
+        user_flags[uid] = "on"
+        await type_and_send(event, START_MSG)
     try:
         sent = await client.send_message(VIRTUAL_BOT, event.text)
-        forward_map[sent.id] = (user_id, event.id)
-        logger.info(f"Forwarded to @{VIRTUAL_BOT} from {user_id}")
+        forward_map[sent.id] = (uid, event.id)
+        logger.info(f"Forwarded to @{VIRTUAL_BOT} from {uid}")
     except Exception as e:
         logger.error(f"Forward error: {e}")
 
-# **** Response Handler ****
+# AI Reply Handler
 @client.on(events.NewMessage(from_users=VIRTUAL_BOT))
-async def response_handler(event):
+async def reply_handler(event):
     if not event.is_reply:
         return
-
-    original_msg = await event.get_reply_message()
-    map_data = forward_map.pop(original_msg.id, None)
-
-    if map_data is None:
+    original = await event.get_reply_message()
+    map_data = forward_map.pop(original.id, None)
+    if not map_data:
         return
-
-    user_id, reply_to = map_data
-
+    uid, reply_to = map_data
     if event.text:
         text = event.text.replace("Nezuko", "Yor")
         text = re.sub(r"@\w+", "@WingedAura", text)
-        await client.send_message(user_id, f"**{text}**", reply_to=reply_to)
-        logger.info(f"Replied to {user_id}")
+        await type_and_send(await client.get_entity(uid), f"**{text}**")
     elif event.media:
         file = await event.download_media()
-        await client.send_file(user_id, file, voice_note=file.endswith(".ogg"), reply_to=reply_to)
-        os.remove(file)
-        logger.info(f"Media sent to {user_id}")
+        await record_and_send(await client.get_entity(uid), file, reply_to)
 
-# **** Commands Handler (Fixed: removed lambda issue) ****
+# Sudo Commands
 @client.on(events.NewMessage(pattern=r"^.([a-z]+)(?:\s+(.*))?", incoming=True))
 async def command_handler(event):
     cmd, arg = event.pattern_match.groups()
-    user_id = event.sender_id
+    uid = event.sender_id
+    if not is_owner_or_mod(uid):
+        return await type_and_send(event, UNAUTHORISED_MSG)
 
-    if not is_owner_or_mod(user_id):
-        return
+    if cmd == "start":
+        await type_and_send(event, (
+            "**⫷ ᴍᴀɪɴ ᴄᴏɴᴛʀᴏʟ ᴘᴀɴᴇʟ ⫸**\n"
+            "**• .start** — ꜱʜᴏᴡ ᴛʜɪꜱ ᴘᴀɴᴇʟ\n"
+            "**• .ping** — ᴘɪɴɢ ᴛᴇꜱᴛ\n"
+            "**• .weather <city>** — ᴄɪᴛʏ ᴡᴇᴀᴛʜᴇʀ\n"
+            "**• .maintenance** — ᴛᴏɢɢʟᴇ ᴍᴀɪɴᴛᴇɴᴀɴᴄᴇ\n"
+            "**• .onall / .offall** — ᴀɪ ᴍᴏᴅᴜʟᴇ ᴛᴏɢɢʟᴇ\n"
+            "**• .stats** — ʙᴏᴛ ꜱᴛᴀᴛꜱ\n"
+            "**• .broadcast <text>** — ᴅᴍ ᴍᴇꜱꜱᴀɢᴇ\n"
+            "**• .broadcastchats <text>** — ɢʀᴏᴜᴘ/ᴄʜᴀɴɴᴇʟ\n"
+            "**• .addmod / .removemod** — ᴍᴏᴅ ᴍᴀɴᴀɢᴇ\n"
+            "**• /pm on | off** — ᴜꜱᴇʀ ᴛᴏɢɢʟᴇ**"
+        ))
 
-    if cmd == "ping":
+    elif cmd == "ping":
         start = time.time()
         msg = await event.reply("**ᴘɪɴɢɪɴɢ...**")
         end = time.time()
@@ -131,24 +152,6 @@ async def command_handler(event):
         except:
             await event.reply("**ᴇʀʀᴏʀ ꜰᴇᴛᴄʜɪɴɢ ᴡᴇᴀᴛʜᴇʀ.**")
 
-    elif cmd == "start":
-        if user_id == OWNER_ID:
-            await event.reply(
-                "**⫷ ᴍᴀɪɴ ᴄᴏɴᴛʀᴏʟ ᴘᴀɴᴇʟ ⫸**\n"
-                "**• .start** — ꜱʜᴏᴡ ᴛʜɪꜱ ᴘᴀɴᴇʟ\n"
-                "**• .ping** — ᴘɪɴɢ ᴛᴇꜱᴛ\n"
-                "**• .weather <city>** — ᴄɪᴛʏ ᴡᴇᴀᴛʜᴇʀ\n"
-                "**• .maintenance** — ᴛᴏɢɢʟᴇ ᴍᴀɪɴᴛᴇɴᴀɴᴄᴇ\n"
-                "**• .onall** — ʀᴇᴇɴᴀʙʟᴇ ᴀɪ ᴍᴏᴅᴜʟᴇ\n"
-                "**• .stats** — ʙᴏᴛ ꜱᴛᴀᴛᴜꜱ\n"
-                "**• .broadcast <text>** — ᴅᴍ ᴍᴇꜱꜱᴀɢᴇ\n"
-                "**• .broadcastchats <text>** — ɢʀᴏᴜᴘ/ᴄʜᴀɴɴᴇʟ\n"
-                "**• .addmod / .removemod** — ᴍᴏᴅ ᴍᴀɴᴀɢᴇ\n"
-                "**• /pm on | off** — ᴜꜱᴇʀ ᴛᴏɢɢʟᴇ"
-            )
-        else:
-            await type_and_send(event, START_MSG)
-
     elif cmd == "maintenance":
         global maintenance_mode
         maintenance_mode = not maintenance_mode
@@ -157,27 +160,33 @@ async def command_handler(event):
     elif cmd == "onall":
         global ai_module_on
         ai_module_on = True
-        await event.reply("**ᴀʟʟ ᴍᴏᴅᴜʟᴇꜱ ʀᴇ-ᴀᴄᴛɪᴠᴀᴛᴇᴅ.**")
+        await event.reply("**ᴀʟʟ ᴍᴏᴅᴜʟᴇꜱ ᴀᴄᴛɪᴠᴀᴛᴇᴅ.**")
+
+    elif cmd == "offall":
+        ai_module_on = False
+        await event.reply("**ᴀʟʟ ᴍᴏᴅᴜʟᴇꜱ ᴅᴇᴀᴄᴛɪᴠᴀᴛᴇᴅ.**")
 
     elif cmd == "stats":
         ram = psutil.virtual_memory()
-        chats, users = await get_dialog_count()
+        chats, users, admins = await get_dialog_stats()
+        admin_list = "\n".join(f"• {chat}" for chat in admins)
         await event.reply(
             f"**ꜱʏꜱᴛᴇᴍ ꜱᴛᴀᴛꜱ:**\n"
-            f"**• ᴜᴘᴛɪᴍᴇ:** `{get_uptime()}`\n"
-            f"**• ʀᴀᴍ ᴜꜱᴀɢᴇ:** `{ram.percent}%`\n"
-            f"**• ᴄʜᴀᴛꜱ:** `{chats}`\n"
-            f"**• ᴜꜱᴇʀꜱ:** `{users}`"
+            f"• **ᴜᴘᴛɪᴍᴇ:** `{get_uptime()}`\n"
+            f"• **ʀᴀᴍ:** `{ram.percent}%`\n"
+            f"• **ᴄʜᴀᴛꜱ:** `{chats}`\n"
+            f"• **ᴜꜱᴇʀꜱ:** `{users}`\n"
+            f"• **ᴀᴅᴍɪɴ ɪɴ:**\n{admin_list}"
         )
 
     elif cmd == "broadcast":
         if not arg:
             return await event.reply("**ᴇɴᴛᴇʀ ᴛᴇxᴛ ᴛᴏ ʙʀᴏᴀᴅᴄᴀꜱᴛ.**")
         count = 0
-        async for dialog in client.iter_dialogs():
-            if dialog.is_user:
+        async for d in client.iter_dialogs():
+            if d.is_user:
                 try:
-                    await client.send_message(dialog.id, arg)
+                    await client.send_message(d.id, arg)
                     count += 1
                 except:
                     continue
@@ -187,10 +196,10 @@ async def command_handler(event):
         if not arg:
             return await event.reply("**ᴇɴᴛᴇʀ ᴛᴇxᴛ ᴛᴏ ʙʀᴏᴀᴅᴄᴀꜱᴛ.**")
         count = 0
-        async for dialog in client.iter_dialogs():
-            if dialog.is_group or dialog.is_channel:
+        async for d in client.iter_dialogs():
+            if d.is_group or d.is_channel:
                 try:
-                    await client.send_message(dialog.id, arg)
+                    await client.send_message(d.id, arg)
                     count += 1
                 except:
                     continue
@@ -198,33 +207,32 @@ async def command_handler(event):
 
     elif cmd == "addmod":
         if event.is_reply:
-            replied = await event.get_reply_message()
-            moderators.add(replied.sender_id)
-            await event.reply(f"**ᴀᴅᴅᴇᴅ `{replied.sender_id}` ᴀꜱ ᴍᴏᴅ.**")
+            r = await event.get_reply_message()
+            moderators.add(r.sender_id)
+            await event.reply(f"**ᴀᴅᴅᴇᴅ `{r.sender_id}` ᴀꜱ ᴍᴏᴅ.**")
         elif arg:
-            entity = await client.get_entity(arg)
-            moderators.add(entity.id)
-            await event.reply(f"**ᴀᴅᴅᴇᴅ `{entity.id}` ᴀꜱ ᴍᴏᴅ.**")
+            e = await client.get_entity(arg)
+            moderators.add(e.id)
+            await event.reply(f"**ᴀᴅᴅᴇᴅ `{e.id}` ᴀꜱ ᴍᴏᴅ.**")
 
     elif cmd == "removemod":
         if event.is_reply:
-            replied = await event.get_reply_message()
-            moderators.discard(replied.sender_id)
-            await event.reply(f"**ʀᴇᴍᴏᴠᴇᴅ `{replied.sender_id}` ꜰʀᴏᴍ ᴍᴏᴅꜱ.**")
+            r = await event.get_reply_message()
+            moderators.discard(r.sender_id)
+            await event.reply(f"**ʀᴇᴍᴏᴠᴇᴅ `{r.sender_id}` ꜰʀᴏᴍ ᴍᴏᴅꜱ.**")
         elif arg:
-            entity = await client.get_entity(arg)
-            moderators.discard(entity.id)
-            await event.reply(f"**ʀᴇᴍᴏᴠᴇᴅ `{entity.id}` ꜰʀᴏᴍ ᴍᴏᴅꜱ.**")
+            e = await client.get_entity(arg)
+            moderators.discard(e.id)
+            await event.reply(f"**ʀᴇᴍᴏᴠᴇᴅ `{e.id}` ꜰʀᴏᴍ ᴍᴏᴅꜱ.**")
 
-# **** /pm on & off ****
+# PM ON / OFF
 @client.on(events.NewMessage(pattern=r"/pm (on|off)"))
 async def toggle_pm(event):
-    user_id = event.sender_id
-    state = event.pattern_match.group(1)
-    user_flags[user_id] = state
-    await event.reply(f"**ᴘʀɪᴠᴀᴛᴇ ᴍᴇꜱꜱᴀɢᴇꜱ `{state}` ꜰᴏʀ ʏᴏᴜ.**")
+    uid = event.sender_id
+    user_flags[uid] = event.pattern_match.group(1)
+    await event.reply(f"ᴘʀɪᴠᴀᴛᴇ ᴍᴇꜱꜱᴀɢᴇꜱ {user_flags[uid]} ꜰᴏʀ ʏᴏᴜ.")
 
-# **** Start the Bot ****
+# Start Bot
 client.start()
-logger.info("Bot is running...")
+logger.info("Bot running...")
 client.run_until_disconnected()
