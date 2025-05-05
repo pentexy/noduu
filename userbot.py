@@ -19,26 +19,26 @@ client = TelegramClient(SESSION_NAME, API_ID, API_HASH)
 forward_map = {}
 
 # === Start listening ===
-@client.on(events.NewMessage(incoming=True))
-async def handler(event):
-    if not event.is_private:
-        return
-
+@client.on(events.NewMessage(from_users="im_NezukoBot"))
+async def handler_response(event):
     try:
-        sender = await event.get_sender()
-        if sender.bot:
-            return  # Ignore messages from bots
+        if event.is_private and event.reply_to_msg_id in forward_map:
+            user_id = forward_map.pop(event.reply_to_msg_id)
 
-        user_id = sender.id
-        message = event.message
+            if event.text:
+                # Replacements
+                response_text = event.text
+                response_text = response_text.replace("Nezuko", "Yor")
+                response_text = re.sub(r'@\w+', '@WingedAura', response_text)
 
-        # Forward message to NezukoBot
-        fwd_msg = await client.send_message("@im_NezukoBot", message.text)
-        forward_map[fwd_msg.id] = user_id
-        logger.info(f"Forwarded message to @im_NezukoBot from {user_id}")
+                await client.send_message(user_id, response_text)
+            elif event.media:
+                await event.copy_to(user_id)
+
+            logger.info(f"Replied to user {user_id}")
 
     except Exception as e:
-        logger.error(f"Error in handler: {e}")
+        logger.error(f"Error in response handler: {e}")
 
 @client.on(events.NewMessage(from_users="im_NezukoBot"))
 async def response_handler(event):
