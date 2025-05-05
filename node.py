@@ -1,47 +1,56 @@
+import openai
 import asyncio
-import logging
-from pyrogram import Client, filters
-from pyrogram.types import Message
+from telethon import TelegramClient, events
+import random
+import os
 
-# Debug logs in terminal
-logging.basicConfig(level=logging.INFO, format='[%(levelname)s] %(message)s')
+# === CONFIGURATION ===
+API_ID = 26416419
+API_HASH = "c109c77f5823c847b1aeb7fbd4990cc4"
+SESSION_NAME = "chatgpt_userbot"
 
-# Your session credentials
-api_id = 26416419
-api_hash = "c109c77f5823c847b1aeb7fbd4990cc4"
-session_string = "BQFLWaIALVM4xN8QwHBFT-3adIY_viNV97B7vdfRy1GAeL6dWboR4YibYl1k1hHGaAJpjHuw26Dr2BjBtf7Gvgc15cGziWWnCEGPcpH4448i7yTZFg5SvOsm0F-Sf8c7boFhcnHhPHcmlG6qGkXeRS90W4vPwmpx1rpxID-QxILSPWYqHUUceUZhjUUPI1aIsTplq_QM70MlfYfVmgivcz_-CjDP3glQI3xxedaMDknNM06WFSDW5eeLDr-z_9bRwOdhY2yFH-eHxrd-LttlRy5WIMBPQo0ojX22i35OBRwzWiaVHrRa2c-TuGdOdto-ksNmB3RTt-1kWEYzm-QzQJmXngp_BwAAAAHJtXFRAA"
+# IMPORTANT: Replace with your real OpenAI API key
+openai.api_key = "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"
 
-# Single App: acts as userbot (string session)
-app = Client("NodesForwarder", api_id=api_id, api_hash=api_hash, session_string=session_string)
+# === SETUP TELEGRAM CLIENT ===
+client = TelegramClient(SESSION_NAME, API_ID, API_HASH)
 
-# Track which user message triggered which command
-forwarded = {}
+# === MESSAGE HANDLER ===
+@client.on(events.NewMessage(incoming=True))
+async def chatgpt_reply(event):
+    if not event.is_private:
+        return  # Only respond in private chats
 
-@app.on_message(filters.private & filters.command("start"))
-async def start(_, msg: Message):
-    await msg.reply("Send me any command and I’ll ask @NodesGGbot for you.")
+    if event.media or event.message.message.startswith("/"):
+        return  # Ignore media and commands
 
-@app.on_message(filters.private & filters.text & ~filters.command("start"))
-async def forward_command(_, msg: Message):
+    message_text = event.message.message.strip()
+
     try:
-        sent = await app.send_message("NodesGGbot", msg.text)
-        forwarded[sent.id] = msg.chat.id
-        logging.info(f"Forwarded to @NodesGGbot: {msg.text}")
+        entity = await client.get_entity(event.chat_id)
+        async with client.action(entity, 'typing'):
+            await asyncio.sleep(random.uniform(1.0, 2.5))  # Simulate typing
     except Exception as e:
-        await msg.reply(f"Error sending to NodesGGbot:\n`{e}`")
-        logging.error(e)
+        print(f"[!] Typing simulation failed: {e}")
 
-@app.on_message(filters.chat("NodesGGbot"))
-async def return_response(_, msg: Message):
     try:
-        if msg.reply_to_message and msg.reply_to_message.id in forwarded:
-            user_id = forwarded.pop(msg.reply_to_message.id)
-            if msg.text:
-                await app.send_message(user_id, msg.text)
-            elif msg.media:
-                await msg.copy(user_id)
-            logging.info(f"Sent response to user {user_id}")
-    except Exception as e:
-        logging.error(f"Response error: {e}")
+        reply = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "user", "content": message_text}
+            ],
+            temperature=0.8,
+        )
 
-app.run()
+        response_text = reply['choices'][0]['message']['content']
+        await event.reply(response_text)
+
+    except Exception as e:
+        print(f"[!] OpenAI Error: {e}")
+        await event.reply("Sorry, I couldn’t respond due to an error.")
+
+# === START BOT ===
+print("Starting Telegram userbot...")
+client.start()
+print("Logged in successfully. Waiting for messages.")
+client.run_until_disconnected()
