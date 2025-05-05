@@ -1,115 +1,152 @@
-import logging
-import re
-from telethon import TelegramClient, events
-from telethon.tl.types import MessageMediaDocument, MessageMediaPhoto
+import asyncio import logging import re import time import psutil import os from datetime import datetime from telethon import TelegramClient, events from telethon.tl.functions.messages import GetDialogsRequest from telethon.tl.types import InputPeerEmpty
 
-# === Your Telegram credentials ===
-api_id = 26416419
-api_hash = "c109c77f5823c847b1aeb7fbd4990cc4"
-session_name = "forward_to_nezuko"
+=== Configuration ===
 
-# === Logging setup ===
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+API_ID = 26416419 API_HASH = "c109c77f5823c847b1aeb7fbd4990cc4" SESSION_NAME = "forward_to_nezuko" OWNER_ID = 6207910305 VIRTUAL_BOT = "im_NezukoBot"
 
-# === Text constants ===
-WELCOME_TEXT = (
-    "**ʏᴏᴜ ᴀʀᴇ ɴᴏᴡ ɢᴏɪɴɢ ᴛᴏ ᴛᴀʟᴋ ᴛᴏ ⧼ [ᴠɪʀᴛᴜᴀʟ ʏᴏʀ ғᴏʀɢᴇʀ](https://t.me/YorXMusicBot) ⧽ — ᴍɪɴᴅ ʏᴏᴜʀ ᴡᴏʀᴅs ʙᴇғᴏʀᴇ sᴘᴇᴀᴋɪɴɢ!**\n\n"
-    "⌬ **ᴜsᴇ** `/pm off` **||** `/pm on` **ᴛᴏ ᴅɪsᴀʙʟᴇ ⊶ᴏʀ⊷ ᴇɴᴀʙʟᴇ ᴍᴇ.**\n\n"
-    "**ᴍᴀᴅᴇ ᴡɪᴛʜ** [ᴅᴇᴠ](https://t.me/WingedAura)💗"
-)
+=== Logging ===
 
-# === Runtime state ===
-forward_map = {}             # {bot_msg_id: (user_id, original_user_msg_id)}
-pm_enabled = {}              # {user_id: True/False}
-welcomed_users = set()       # user_ids who got welcome
+logging.basicConfig(level=logging.INFO) logger = logging.getLogger(name)
 
-# === Initialize Telegram client ===
-client = TelegramClient(session_name, api_id, api_hash)
+=== Client Init ===
 
-@client.on(events.NewMessage(incoming=True))
-async def handle_user_message(event):
-    sender = await event.get_sender()
-    if not event.is_private or sender.bot:
-        return
+client = TelegramClient(SESSION_NAME, API_ID, API_HASH) forward_map = {} user_flags = {} moderators = set() start_time = time.time()
 
-    user_id = event.sender_id
-    msg_text = event.raw_text.strip()
+=== Maintenance Mode ===
 
-    # Handle PM toggle commands
-    if msg_text.lower() == "/pm off":
-        pm_enabled[user_id] = False
-        await event.reply("**ᴠɪʀᴛᴜᴀʟ ʏᴏᴜʀ ᴘᴍ ᴍᴏᴅᴇ ɪs sᴜᴄᴄᴇssғᴜʟʟʏ ᴅɪsᴀʙʟᴇᴅ !**\n**ᴜsᴇ ➠** `/pm on` **ᴛᴏ ᴇɴᴀʙʟᴇ ɪᴛ ᴀɴʏᴛɪᴍᴇ **")
-        logger.info(f"User {user_id} disabled PM mode.")
-        return
-    elif msg_text.lower() == "/pm on":
-        pm_enabled[user_id] = True
-        await event.reply("**ᴠɪʀᴛᴜᴀʟ ʏᴏᴜʀ ᴘᴍ ᴍᴏᴅᴇ ɪs ᴄᴜʀʀᴇɴᴛʟʏ ᴇɴᴀʙʟᴇᴅ,ᴛᴀʟᴋ ғʀᴇᴇʟʏ 💗 !**")
-        logger.info(f"User {user_id} enabled PM mode.")
-        return
+maintenance_mode = False ai_module_on = True
 
-    # PM mode check
-    if not pm_enabled.get(user_id, True):
-        return
+=== Startup Text ===
 
-    # Welcome user once
-    if user_id not in welcomed_users:
-        await event.reply(WELCOME_TEXT)
-        welcomed_users.add(user_id)
+START_MSG = ( "ʏᴏᴜ ᴀʀᴇ ɴᴏᴡ ɢᴏɪɴɢ ᴛᴏ ᴛᴀʟᴋ ᴛᴏ ⧼ ᴠɪʀᴛᴜᴀʟ ʏᴏʀ ғᴏʀɢᴇʀ ⧽ — ᴍɪɴᴅ ʏᴏᴜʀ ᴡᴏʀᴅs ʙᴇғᴏʀᴇ sᴘᴇᴀᴋɪɴɢ!\n\n" "⌬ ᴜsᴇ /pm off || on ᴛᴏ ᴅɪsᴀʙʟᴇ ⊶ᴏʀ⊷ ᴇɴᴀʙʟᴇ ᴍᴇ.\n" "ᴍᴀᴅᴇ ᴡɪᴛʜ ᴅᴇᴠ" )
 
-    try:
-        # Forward message to @im_NezukoBot
-        if event.text:
-            fwd = await client.send_message("im_NezukoBot", event.text)
-        elif event.media:
-            fwd = await event.forward_to("im_NezukoBot")
-        else:
-            return
+=== Helper Functions ===
 
-        forward_map[fwd.id] = (user_id, event.id)
-        logger.info(f"Forwarded message to @im_NezukoBot from {user_id}")
+def is_owner_or_mod(user_id): return user_id == OWNER_ID or user_id in moderators
 
-    except Exception as e:
-        logger.error(f"Failed to forward: {e}")
-        await event.reply("Something went wrong forwarding your message.")
+def get_uptime(): return str(datetime.utcnow() - datetime.utcfromtimestamp(start_time)).split('.')[0]
 
-@client.on(events.NewMessage(from_users="im_NezukoBot"))
-async def handle_bot_response(event):
-    try:
-        if not event.is_reply:
-            return
+async def get_dialog_count(): dialogs = await client(GetDialogsRequest(offset_date=None, offset_id=0, offset_peer=InputPeerEmpty(), limit=100, hash=0)) return len(dialogs.chats), len(dialogs.users)
 
-        reply_to = await event.get_reply_message()
-        user_info = forward_map.pop(reply_to.id, None)
+=== Main Message Handler ===
 
-        if not user_info:
-            return
+@client.on(events.NewMessage(incoming=True)) async def main_handler(event): sender = await event.get_sender() user_id = event.sender_id
 
-        user_id, reply_msg_id = user_info
+if not event.is_private or sender.bot:
+    return
 
-        # Simulate typing or recording action
-        async with client.action(user_id, 'typing' if event.text else 'record-audio'):
-            if event.text:
-                # Replace "Nezuko" and usernames
-                text = event.raw_text.replace("Nezuko", "Yor")
-                if "Nezuko" in event.raw_text:
-                    logger.info("Replacing 'Nezuko' with 'Yor'")
-                if re.search(r"@\w+", text):
-                    logger.info("Replacing usernames with @WingedAura")
-                text = re.sub(r"@\w+", "@WingedAura", text)
+if maintenance_mode or not ai_module_on or user_flags.get(user_id) == "off":
+    return
 
-                await client.send_message(user_id, text, reply_to=reply_msg_id)
+if user_id not in user_flags:
+    user_flags[user_id] = "on"
+    await event.reply(START_MSG, link_preview=False)
 
-            elif event.media:
-                await event.forward_to(user_id)
-                logger.info(f"Forwarded media to {user_id}")
+try:
+    sent = await client.send_message(VIRTUAL_BOT, event.text)
+    forward_map[sent.id] = (user_id, event.id)
+    logger.info(f"Forwarded message to @{VIRTUAL_BOT} from {user_id}")
+except Exception as e:
+    logger.error(f"Failed to forward: {e}")
 
-        logger.info(f"Responded to user {user_id}")
+=== Response Handler ===
 
-    except Exception as e:
-        logger.error(f"Error replying to user: {e}")
+@client.on(events.NewMessage(from_users=VIRTUAL_BOT)) async def response_handler(event): if not event.is_reply: return
 
-# === Start the client ===
-client.start()
-logger.info("Bot is running. Waiting for messages...")
-client.run_until_disconnected()
+original_msg = await event.get_reply_message()
+map_data = forward_map.pop(original_msg.id, None)
+
+if map_data is None:
+    return
+
+user_id, reply_to = map_data
+
+if event.text:
+    response_text = event.text.replace("Nezuko", "Yor")
+    response_text = re.sub(r"@\w+", "@WingedAura", response_text)
+    await client.send_message(user_id, response_text, reply_to=reply_to)
+    logger.info(f"Replied to user {user_id} with text")
+elif event.media:
+    file = await event.download_media()
+    await client.send_file(user_id, file, voice_note=file.endswith(".ogg"), reply_to=reply_to)
+    os.remove(file)
+    logger.info(f"Replied to user {user_id} with media")
+
+=== Command Handler ===
+
+@client.on(events.NewMessage(pattern=r"^.([a-z]+)(?:\s+(.*))?", from_users=lambda u: True)) async def command_handler(event): cmd, arg = event.pattern_match.groups() user_id = event.sender_id is_mod = is_owner_or_mod(user_id)
+
+if not is_mod:
+    return
+
+if cmd == "stats":
+    ram = psutil.virtual_memory()
+    latency = round(client._ping, 3) if hasattr(client, '_ping') else "N/A"
+    chats, users = await get_dialog_count()
+    await event.reply(
+        f"**ꜱʏꜱᴛᴇᴍ ꜱᴛᴀᴛꜱ:**\n"
+        f"• ᴜᴘᴛɪᴍᴇ: `{get_uptime()}`\n"
+        f"• ʀᴀᴍ ᴜꜱᴀɢᴇ: `{ram.percent}%`\n"
+        f"• ᴄʜᴀᴛꜱ: `{chats}`\n"
+        f"• ᴜꜱᴇʀꜱ: `{users}`\n"
+        f"• ʟᴀᴛᴇɴᴄʏ: `{latency}`"
+    )
+
+elif cmd == "maineteinance":
+    global maintenance_mode
+    maintenance_mode = not maintenance_mode
+    await event.reply(f"**ᴍᴀɪɴᴛᴇɴᴀɴᴄᴇ ᴍᴏᴅᴇ:** `{maintenance_mode}`")
+
+elif cmd == "offall":
+    global ai_module_on
+    ai_module_on = False
+    await event.reply("**ᴀɪ ᴍᴏᴅᴜʟᴇ ꜰᴜʟʟʏ ᴏꜰꜰʟɪɴᴇ.**")
+
+elif cmd == "broadcast":
+    if not arg:
+        return await event.reply("ᴘʟᴇᴀꜱᴇ ᴘʀᴏᴠɪᴅᴇ ᴀ ᴍᴇꜱꜱᴀɢᴇ ᴛᴏ ʙʀᴏᴀᴅᴄᴀꜱᴛ.")
+    count = 0
+    async for dialog in client.iter_dialogs():
+        if dialog.is_user:
+            try:
+                await client.send_message(dialog.id, arg)
+                count += 1
+            except:
+                continue
+    await event.reply(f"**ʙʀᴏᴀᴅᴄᴀꜱᴛᴇᴅ ᴛᴏ `{count}` ᴅᴍꜱ.**")
+
+elif cmd == "broadcastchats":
+    if not arg:
+        return await event.reply("ᴘʟᴇᴀꜱᴇ ᴘʀᴏᴠɪᴅᴇ ᴀ ᴍᴇꜱꜱᴀɢᴇ ᴛᴏ ʙʀᴏᴀᴅᴄᴀꜱᴛ.")
+    count = 0
+    async for dialog in client.iter_dialogs():
+        if dialog.is_group or dialog.is_channel:
+            try:
+                await client.send_message(dialog.id, arg)
+                count += 1
+            except:
+                continue
+    await event.reply(f"**ʙʀᴏᴀᴅᴄᴀꜱᴛᴇᴅ ᴛᴏ `{count}` ᴄʜᴀᴛꜱ.**")
+
+elif cmd == "addmod":
+    if event.is_reply:
+        replied = await event.get_reply_message()
+        moderators.add(replied.sender_id)
+        await event.reply(f"ᴀᴅᴅᴇᴅ {replied.sender_id} ᴀꜱ ᴍᴏᴅᴇʀᴀᴛᴏʀ.")
+    elif arg:
+        entity = await client.get_entity(arg)
+        moderators.add(entity.id)
+        await event.reply(f"ᴀᴅᴅᴇᴅ {entity.id} ᴀꜱ ᴍᴏᴅᴇʀᴀᴛᴏʀ.")
+
+elif cmd == "removemod":
+    if event.is_reply:
+        replied = await event.get_reply_message()
+        moderators.discard(replied.sender_id)
+        await event.reply(f"ʀᴇᴍᴏᴠᴇᴅ {replied.sender_id} ꜰʀᴏᴍ ᴍᴏᴅꜱ.")
+    elif arg:
+        entity = await client.get_entity(arg)
+        moderators.discard(entity.id)
+        await event.reply(f"ʀᴇᴍᴏᴠᴇᴅ {entity.id} ꜰʀᴏᴍ ᴍᴏᴅꜱ.")
+
+client.start() logger.info("Bot is running...") client.run_until_disconnected()
+
