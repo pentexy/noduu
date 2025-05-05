@@ -1,24 +1,42 @@
 import asyncio
 import logging
+import re
 from telethon import TelegramClient, events
-from collections import defaultdict
 
-# === Configuration ===
-API_ID = 26416419
-API_HASH = "c109c77f5823c847b1aeb7fbd4990cc4"
-SESSION_NAME = "forward_to_nezuko"
-
-# === Setup logging ===
+# Logging setup
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = logging.getLogger()
 
-# === Setup client ===
-client = TelegramClient(SESSION_NAME, API_ID, API_HASH)
+# === Your Telegram API Credentials ===
+api_id = 26416419
+api_hash = "c109c77f5823c847b1aeb7fbd4990cc4"
+session_name = "forward_to_nezuko"
 
-# Store message links: forwarded_msg_id -> original_user_id
+# Create the client
+client = TelegramClient(session_name, api_id, api_hash)
+
+# Map to track forwarded messages
 forward_map = {}
 
-# === Start listening ===
+@client.on(events.NewMessage(incoming=True))
+async def handler(event):
+    try:
+        # Only handle private messages from real users
+        if not event.is_private or not event.sender:
+            return
+
+        sender = await event.get_sender()
+        if sender.bot:
+            return
+
+        # Forward message to bot
+        fwd_msg = await client.send_message("im_NezukoBot", event.text)
+        forward_map[fwd_msg.id] = event.sender_id
+        logger.info(f"Forwarded message to @im_NezukoBot from {event.sender_id}")
+
+    except Exception as e:
+        logger.error(f"Error in handler: {e}")
+
 @client.on(events.NewMessage(from_users="im_NezukoBot"))
 async def handler_response(event):
     try:
@@ -26,37 +44,25 @@ async def handler_response(event):
             user_id = forward_map.pop(event.reply_to_msg_id)
 
             if event.text:
-                # Replacements
                 response_text = event.text
+                # Replace 'Nezuko' with 'Yor' (case-sensitive)
                 response_text = response_text.replace("Nezuko", "Yor")
+                # Replace @usernames with @WingedAura
                 response_text = re.sub(r'@\w+', '@WingedAura', response_text)
 
                 await client.send_message(user_id, response_text)
+                logger.info(f"Replied to user {user_id}")
             elif event.media:
                 await event.copy_to(user_id)
-
-            logger.info(f"Replied to user {user_id}")
+                logger.info(f"Copied media to user {user_id}")
 
     except Exception as e:
         logger.error(f"Error in response handler: {e}")
 
-@client.on(events.NewMessage(from_users="im_NezukoBot"))
-async def response_handler(event):
-    if not event.reply_to_msg_id:
-        return  # Only handle replies
+async def main():
+    await client.start()
+    print("Userbot is running. Waiting for messages...")
+    await client.run_until_disconnected()
 
-    replied_msg_id = event.reply_to_msg_id
-
-    if replied_msg_id in forward_map:
-        user_id = forward_map.pop(replied_msg_id)
-        try:
-            await client.send_message(user_id, event.text)
-            logger.info(f"Replied to user {user_id}")
-        except Exception as e:
-            logger.error(f"Failed to reply to user {user_id}: {e}")
-
-# === Start the client ===
-logger.info("Starting the userbot...")
-client.start()
-logger.info("Userbot started. Waiting for messages...")
-client.run_until_disconnected()
+if __name__ == "__main__":
+    asyncio.run(main())
