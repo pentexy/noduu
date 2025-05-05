@@ -13,7 +13,7 @@ from telethon.tl.types import InputPeerEmpty
 # **** Configuration ****
 API_ID = 26416419
 API_HASH = "c109c77f5823c847b1aeb7fbd4990cc4"
-SESSION_NAME = "forward_to_nezuko"
+SESSION_NAME = "forward_to_nzuko"
 OWNER_ID = 6748827895
 VIRTUAL_BOT = "im_NezukoBot"
 
