@@ -39,7 +39,7 @@ async def handle_user_message(event):
     # Handle PM toggle commands
     if msg_text.lower() == "/pm off":
         pm_enabled[user_id] = False
-        await event.reply("**ᴠɪʀᴛᴜᴀʟ ʏᴏᴜʀ ᴘᴍ ᴍᴏᴅᴇ ɪs ᴄᴜʀʀᴇɴᴛʟʏ ᴅɪsᴀʙʟᴇᴅ !**\n **ᴜsᴇ ➠** `/pm on` **ᴛᴏ ᴇɴᴀʙʟᴇ ɪᴛ ᴀɴʏᴛɪᴍᴇ ☺️**")
+        await event.reply("**ᴠɪʀᴛᴜᴀʟ ʏᴏᴜʀ ᴘᴍ ᴍᴏᴅᴇ ɪs sᴜᴄᴄᴇssғᴜʟʟʏ ᴅɪsᴀʙʟᴇᴅ !**\n**ᴜsᴇ ➠** `/pm on` **ᴛᴏ ᴇɴᴀʙʟᴇ ɪᴛ ᴀɴʏᴛɪᴍᴇ **")
         logger.info(f"User {user_id} disabled PM mode.")
         return
     elif msg_text.lower() == "/pm on":
