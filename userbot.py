@@ -14,7 +14,7 @@ session_name = "forward_to_nezuko"
 # Initialize the client
 client = TelegramClient(session_name, api_id, api_hash)
 
-# Store mapping of forwarded messages to user
+# Store mapping of forwarded message ID -> (user ID, original_msg_id)
 forward_map = {}
 
 @client.on(events.NewMessage(incoming=True))
@@ -25,11 +25,11 @@ async def handler(event):
 
     user_id = event.sender_id
     text = event.raw_text.strip()
-    
-    # Forward the user's message to @im_NezukoBot
+
     try:
+        # Forward to bot
         sent = await client.send_message("im_NezukoBot", text)
-        forward_map[sent.id] = user_id
+        forward_map[sent.id] = (user_id, event.id)  # Store original message ID
         logger.info(f"Forwarded message to @im_NezukoBot from {user_id}")
     except Exception as e:
         logger.error(f"Failed to forward message: {e}")
@@ -42,18 +42,24 @@ async def reply_from_bot(event):
             return
 
         original_msg = await event.get_reply_message()
-        user_id = forward_map.pop(original_msg.id, None)
+        user_data = forward_map.pop(original_msg.id, None)
 
-        if user_id is None:
+        if user_data is None:
             return
 
+        user_id, reply_to_msg_id = user_data
         text = event.raw_text
 
-        # Replace "Nezuko" with "Yor" and usernames with @WingedAura
-        text = text.replace("Nezuko", "Yor")
-        text = re.sub(r"@\w+", "@WingedAura", text)
+        if "Nezuko" in text:
+            logger.info("Replacing 'Nezuko' with 'Yor'")
+            text = text.replace("Nezuko", "Yor")
 
-        await client.send_message(user_id, text)
+        usernames = re.findall(r"@\w+", text)
+        if usernames:
+            logger.info(f"Replacing usernames {usernames} with '@WingedAura'")
+            text = re.sub(r"@\w+", "@WingedAura", text)
+
+        await client.send_message(user_id, text, reply_to=reply_to_msg_id)
         logger.info(f"Replied to user {user_id}")
     except Exception as e:
         logger.error(f"Error replying to user: {e}")
