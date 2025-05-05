@@ -9,6 +9,8 @@ from datetime import datetime
 from telethon import TelegramClient, events
 from telethon.tl.functions.messages import GetDialogsRequest
 from telethon.tl.types import InputPeerEmpty
+from telethon.tl.functions.messages import SetTyping
+from telethon.tl.types import SendMessageTypingAction
 
 # **** Configuration ****
 API_ID = 26416419
@@ -40,7 +42,7 @@ START_MSG = (
     "**➪ ᴍᴀᴅᴇ ᴡɪᴛʜ [ᴅᴇᴠ 💗](https://t.me/WingedAura)**"
 )
 
-# **** Helper Functions ****
+# **** Helpers ****
 def is_owner_or_mod(user_id):
     return user_id == OWNER_ID or user_id in moderators
 
@@ -48,25 +50,23 @@ def get_uptime():
     return str(datetime.utcnow() - datetime.utcfromtimestamp(start_time)).split('.')[0]
 
 async def get_dialog_count():
-    dialogs = await client(GetDialogsRequest(offset_date=None, offset_id=0, offset_peer=InputPeerEmpty(), limit=100, hash=0))
+    dialogs = await client(GetDialogsRequest(
+        offset_date=None, offset_id=0, offset_peer=InputPeerEmpty(), limit=100, hash=0))
     return len(dialogs.chats), len(dialogs.users)
 
 async def type_and_send(event, message, **kwargs):
-    async with client.action(event.chat_id, "typing"):
-        await asyncio.sleep(0.2)  # faster typing
-        await event.reply(message, **kwargs)
+    await client(SetTypingRequest(event.chat_id, SendMessageTypingAction()))
+    await asyncio.sleep(0.4)
+    await event.reply(message, **kwargs)
 
-# **** Main Message Handler ****
+# **** Message Handler ****
 @client.on(events.NewMessage(incoming=True))
 async def main_handler(event):
     sender = await event.get_sender()
     user_id = event.sender_id
 
-    if not event.is_private or sender.bot:
+    if not event.is_private or sender.bot or not event.text or event.text.startswith("."):
         return
-
-    if event.text and event.text.startswith("."):
-        return  # ignore commands
 
     if maintenance_mode or not ai_module_on or user_flags.get(user_id) == "off":
         return
@@ -91,7 +91,7 @@ async def response_handler(event):
     original_msg = await event.get_reply_message()
     map_data = forward_map.pop(original_msg.id, None)
 
-    if map_data is None:
+    if not map_data:
         return
 
     user_id, reply_to = map_data
@@ -100,15 +100,13 @@ async def response_handler(event):
         text = event.text.replace("Nezuko", "Yor")
         text = re.sub(r"@\w+", "@WingedAura", text)
         await client.send_message(user_id, f"**{text}**", reply_to=reply_to)
-        logger.info(f"Replied to {user_id}")
     elif event.media:
         file = await event.download_media()
         await client.send_file(user_id, file, voice_note=file.endswith(".ogg"), reply_to=reply_to)
         os.remove(file)
-        logger.info(f"Media sent to {user_id}")
 
-# **** Commands ****
-@client.on(events.NewMessage(pattern=r"^.([a-z]+)(?:\s+(.*))?", from_users=lambda u: True))
+# **** Command Handler ****
+@client.on(events.NewMessage(pattern=r"^.([a-z]+)(?:\s+(.*))?"))
 async def command_handler(event):
     cmd, arg = event.pattern_match.groups()
     user_id = event.sender_id
@@ -119,8 +117,8 @@ async def command_handler(event):
     if cmd == "ping":
         start = time.time()
         msg = await event.reply("**ᴘɪɴɢɪɴɢ...**")
-        end = time.time()
-        await msg.edit(f"**ᴘᴏɴɢ!** 🏓 `{round((end-start)*1000)}ms`")
+        await asyncio.sleep(0.3)
+        await msg.edit(f"**ᴘᴏɴɢ!** 🏓 `{round((time.time() - start)*1000)}ms`")
 
     elif cmd == "weather":
         if not arg:
@@ -216,7 +214,7 @@ async def command_handler(event):
             moderators.discard(entity.id)
             await event.reply(f"**ʀᴇᴍᴏᴠᴇᴅ `{entity.id}` ꜰʀᴏᴍ ᴍᴏᴅꜱ.**")
 
-# **** /pm on & off ****
+# **** /pm on | off ****
 @client.on(events.NewMessage(pattern=r"/pm (on|off)"))
 async def toggle_pm(event):
     user_id = event.sender_id
@@ -224,7 +222,7 @@ async def toggle_pm(event):
     user_flags[user_id] = state
     await event.reply(f"**ᴘʀɪᴠᴀᴛᴇ ᴍᴇꜱꜱᴀɢᴇꜱ `{state}` ꜰᴏʀ ʏᴏᴜ.**")
 
-# **** Start the Bot ****
+# **** Start ****
 client.start()
 logger.info("Bot is running...")
 client.run_until_disconnected()
