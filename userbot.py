@@ -21,21 +21,24 @@ forward_map = {}
 # === Start listening ===
 @client.on(events.NewMessage(incoming=True))
 async def handler(event):
-    # Ignore messages from channels, groups, and bots
-    if not event.is_private or event.sender.bot:
+    if not event.is_private:
         return
 
-    sender = await event.get_sender()
-    user_id = sender.id
-    message = event.message
-
     try:
-        # Forward user message to NezukoBot
+        sender = await event.get_sender()
+        if sender.bot:
+            return  # Ignore messages from bots
+
+        user_id = sender.id
+        message = event.message
+
+        # Forward message to NezukoBot
         fwd_msg = await client.send_message("@im_NezukoBot", message.text)
         forward_map[fwd_msg.id] = user_id
         logger.info(f"Forwarded message to @im_NezukoBot from {user_id}")
+
     except Exception as e:
-        logger.error(f"Error forwarding message: {e}")
+        logger.error(f"Error in handler: {e}")
 
 @client.on(events.NewMessage(from_users="im_NezukoBot"))
 async def response_handler(event):
