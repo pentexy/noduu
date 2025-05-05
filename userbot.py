@@ -1,50 +1,49 @@
-import openai
 import asyncio
 from telethon import TelegramClient, events
-import random
+import logging
 
-# === CONFIGURATION ===
+logging.basicConfig(level=logging.INFO)
+
+# === REQUIRED ===
 API_ID = 26416419
 API_HASH = "c109c77f5823c847b1aeb7fbd4990cc4"
-SESSION_NAME = "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"
+SESSION_NAME = "forwarder_bot"
 
-# === OPENAI KEY ===
-openai.api_key = ""
-
-# === SETUP TELEGRAM CLIENT ===
 client = TelegramClient(SESSION_NAME, API_ID, API_HASH)
 
-# === MESSAGE HANDLER ===
+forwarded_messages = {}
+
 @client.on(events.NewMessage(incoming=True))
-async def chatgpt_reply(event):
-    if not event.is_private:
-        return  # Only respond in private chats
-
-    if event.media or event.message.message.startswith("/"):
-        return  # Ignore media and commands
-
-    message_text = event.message.message.strip()
-
-    async with event.client.action(event.chat_id, 'typing'):
-        await asyncio.sleep(random.uniform(1.0, 3.0))  # Simulate typing delay
+async def forward_to_nezuko(event):
+    if not event.is_private or event.sender_id == (await client.get_me()).id:
+        return
 
     try:
-        reply = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "user", "content": message_text}
-            ],
-            temperature=0.8,
-        )
-
-        response_text = reply['choices'][0]['message']['content']
-        await event.reply(response_text)
-
+        # Forward user's message to @im_NezukoBot
+        fwd = await client.send_message("im_NezukoBot", event.text)
+        forwarded_messages[fwd.id] = event.chat_id
+        logging.info(f"Forwarded message to @im_NezukoBot: {event.text}")
     except Exception as e:
-        await event.reply("Sorry, something went wrong with ChatGPT.")
+        await event.reply("Failed to forward message.")
+        logging.error(e)
 
-# === START BOT ===
-print("Starting Telegram userbot...")
-client.start()
-print("Logged in successfully. Waiting for private messages...")
-client.run_until_disconnected()
+@client.on(events.NewMessage(from_users="im_NezukoBot"))
+async def handle_bot_response(event):
+    reply_to = event.reply_to_msg_id
+    user_id = forwarded_messages.get(reply_to)
+
+    if user_id:
+        try:
+            await client.send_message(user_id, event.text or "<Media received>")
+            logging.info(f"Sent response to user {user_id}")
+            del forwarded_messages[reply_to]
+        except Exception as e:
+            logging.error(e)
+
+async def main():
+    print("Logging in...")
+    await client.start()
+    print("Logged in successfully. Waiting for private messages...")
+    await client.run_until_disconnected()
+
+asyncio.run(main())
