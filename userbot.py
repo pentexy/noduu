@@ -171,54 +171,54 @@ async def command_handler(event):
 
 
  elif cmd == "broadcast":
-    if event.reply_to_msg_id:
-        reply_msg = await event.get_reply_message()
-        count = 0
-        async for dialog in client.iter_dialogs():
-            if dialog.is_user:
-                try:
-                    await client.forward_messages(dialog.id, reply_msg)
-                    count += 1
-                except:
-                    continue
-        await event.reply(f"**ғᴏʀᴡᴀʀᴅᴇᴅ ᴛᴏ `{count}` ᴜꜱᴇʀꜱ.**")
-    else:
-        if not arg:
-            return await event.reply("**ᴘʟᴇᴀꜱᴇ ᴘʀᴏᴠɪᴅᴇ ᴛᴇxᴛ ᴏʀ ʀᴇᴘʟʏ ᴛᴏ ᴀ ᴍᴇꜱꜱᴀɢᴇ.**")
-        count = 0
-        async for dialog in client.iter_dialogs():
-            if dialog.is_user:
-                try:
-                    await client.send_message(dialog.id, arg)
-                    count += 1
-                except:
-                    continue
-        await event.reply(f"**sᴇɴᴛ ᴛᴏ `{count}` ᴜꜱᴇʀꜱ.**")
+        if event.reply_to_msg_id:
+            reply_msg = await event.get_reply_message()
+            count = 0
+            async for dialog in client.iter_dialogs():
+                if dialog.is_user:
+                    try:
+                        await client.forward_messages(dialog.id, reply_msg)
+                        count += 1
+                    except:
+                        continue
+            await event.reply(f"**ғᴏʀᴡᴀʀᴅᴇᴅ ᴛᴏ `{count}` ᴜꜱᴇʀꜱ.**")
+        else:
+            if not arg:
+                return await event.reply("**ᴘʟᴇᴀꜱᴇ ᴘʀᴏᴠɪᴅᴇ ᴛᴇxᴛ ᴏʀ ʀᴇᴘʟʏ ᴛᴏ ᴀ ᴍᴇꜱꜱᴀɢᴇ.**")
+            count = 0
+            async for dialog in client.iter_dialogs():
+                if dialog.is_user:
+                    try:
+                        await client.send_message(dialog.id, arg)
+                        count += 1
+                    except:
+                        continue
+            await event.reply(f"**sᴇɴᴛ ᴛᴏ `{count}` ᴜꜱᴇʀꜱ.**")
 
-elif cmd == "broadcastchats":
-    if event.reply_to_msg_id:
-        reply_msg = await event.get_reply_message()
-        count = 0
-        async for dialog in client.iter_dialogs():
-            if dialog.is_group or dialog.is_channel:
-                try:
-                    await client.forward_messages(dialog.id, reply_msg)
-                    count += 1
-                except:
-                    continue
-        await event.reply(f"**ғᴏʀᴡᴀʀᴅᴇᴅ ᴛᴏ `{count}` ᴄʜᴀᴛꜱ.**")
-    else:
-        if not arg:
-            return await event.reply("**ᴘʟᴇᴀꜱᴇ ᴘʀᴏᴠɪᴅᴇ ᴛᴇxᴛ ᴏʀ ʀᴇᴘʟʏ ᴛᴏ ᴀ ᴍᴇꜱꜱᴀɢᴇ.**")
-        count = 0
-        async for dialog in client.iter_dialogs():
-            if dialog.is_group or dialog.is_channel:
-                try:
-                    await client.send_message(dialog.id, arg)
-                    count += 1
-                except:
-                    continue
-        await event.reply(f"**sᴇɴᴛ ᴛᴏ `{count}` ᴄʜᴀᴛꜱ.**")
+    elif cmd == "broadcastchats":
+        if event.reply_to_msg_id:
+            reply_msg = await event.get_reply_message()
+            count = 0
+            async for dialog in client.iter_dialogs():
+                if dialog.is_group or dialog.is_channel:
+                    try:
+                        await client.forward_messages(dialog.id, reply_msg)
+                        count += 1
+                    except:
+                        continue
+            await event.reply(f"**ғᴏʀᴡᴀʀᴅᴇᴅ ᴛᴏ `{count}` ᴄʜᴀᴛꜱ.**")
+        else:
+            if not arg:
+                return await event.reply("**ᴘʟᴇᴀꜱᴇ ᴘʀᴏᴠɪᴅᴇ ᴛᴇxᴛ ᴏʀ ʀᴇᴘʟʏ ᴛᴏ ᴀ ᴍᴇꜱꜱᴀɢᴇ.**")
+            count = 0
+            async for dialog in client.iter_dialogs():
+                if dialog.is_group or dialog.is_channel:
+                    try:
+                        await client.send_message(dialog.id, arg)
+                        count += 1
+                    except:
+                        continue
+            await event.reply(f"**sᴇɴᴛ ᴛᴏ `{count}` ᴄʜᴀᴛꜱ.**")
 
     elif cmd == "addmod":
         if event.is_reply:
