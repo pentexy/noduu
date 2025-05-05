@@ -169,6 +169,7 @@ async def command_handler(event):
             f"• ᴄʜᴀᴛꜱ: `{chats}` | ᴜꜱᴇʀꜱ: `{users}`"
         )
 
+
 elif cmd == "broadcast":
     if event.reply_to_msg_id:
         reply_msg = await event.get_reply_message()
@@ -193,7 +194,6 @@ elif cmd == "broadcast":
                 except:
                     continue
         await event.reply(f"**sᴇɴᴛ ᴛᴏ `{count}` ᴜꜱᴇʀꜱ.**")
-
 
 elif cmd == "broadcastchats":
     if event.reply_to_msg_id:
