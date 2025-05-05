@@ -1,9 +1,9 @@
 from instagrapi import Client
 from datetime import datetime
-import time
-import threading
 import getpass
+import time
 
+# Temp AFK state
 afk_data = {
     "status": False,
     "reason": None,
@@ -11,6 +11,8 @@ afk_data = {
 }
 
 cl = Client()
+
+# Login
 username = input("Enter Instagram Username: ")
 password = getpass.getpass("Enter Password: ")
 
@@ -23,15 +25,23 @@ except Exception as e:
     print(f"❌ ʟᴏɢɪɴ ꜰᴀɪʟᴇᴅ: {e}")
     exit()
 
+# Notify @uchiha.rar bot is live
+try:
+    uchiha_id = cl.user_id_from_username("uchiha.rar")
+    cl.direct_send("ʏᴏᴜꜱᴇʀʙᴏᴛ ɪꜱ ꜱᴛᴀʀᴛᴇᴅ ᴀɴᴅ ʟɪᴠᴇ ✅", [uchiha_id])
+    print("✅ ɴᴏᴛɪꜰɪᴇᴅ @uchiha.rar ᴛʜᴀᴛ ʙᴏᴛ ɪꜱ ʟɪᴠᴇ.")
+except Exception as e:
+    print(f"❌ ꜰᴀɪʟᴇᴅ ᴛᴏ ɴᴏᴛɪꜰʏ @uchiha.rar: {e}")
+
 def format_afk_message():
     elapsed = datetime.now() - afk_data["since"]
-    hours, remainder = divmod(int(elapsed.total_seconds()), 3600)
-    minutes, seconds = divmod(remainder, 60)
-    offline_time = f"{hours}h {minutes}m {seconds}s"
+    hours, rem = divmod(int(elapsed.total_seconds()), 3600)
+    mins, secs = divmod(rem, 60)
+    time_str = f"{hours}ʜ {mins}ᴍ {secs}ꜱ"
     return (
         "ᴍʏ ᴏᴡɴᴇʀ ɪꜱ ᴀꜰᴋ !\n"
         f"ʀᴇᴀꜱᴏɴ : {afk_data['reason']}\n"
-        f"ᴏꜰꜰʟɪɴᴇ ᴘᴀʀᴀᴍᴇᴛᴇʀ : {offline_time}"
+        f"ᴏꜰꜰʟɪɴᴇ ᴘᴀʀᴀᴍᴇᴛᴇʀ : {time_str}"
     )
 
 def check_and_handle_commands(thread, msg, sender_id):
@@ -42,14 +52,14 @@ def check_and_handle_commands(thread, msg, sender_id):
             afk_data["reason"] = msg.text[5:].strip()
             afk_data["since"] = datetime.now()
             afk_data["status"] = True
-            cl.direct_send("ʏᴏᴜ ᴀʀᴇ ɴᴏᴡ ᴀꜰᴋ ! 😾", [thread.id])
+            cl.direct_answer(thread.id, "ʏᴏᴜ ᴀʀᴇ ɴᴏᴡ ᴀꜰᴋ ! 😾")
         elif text == "/back":
             afk_data["status"] = False
             afk_data["reason"] = None
             afk_data["since"] = None
-            cl.direct_send("✅ ʏᴏᴜ ᴀʀᴇ ʙᴀᴄᴋ ɴᴏᴡ.", [thread.id])
+            cl.direct_answer(thread.id, "✅ ʏᴏᴜ ᴀʀᴇ ʙᴀᴄᴋ ɴᴏᴡ.")
     elif afk_data["status"] and not text.startswith("/"):
-        cl.direct_send(format_afk_message(), [sender_id])
+        cl.direct_answer(thread.id, format_afk_message())
 
 def handle_messages():
     print("ʙᴏᴛ ɪꜱ ʀᴜɴɴɪɴɢ. ꜰᴜʟʟ ᴀꜰᴋ ᴄᴏɴᴛʀᴏʟ ᴠɪᴀ ᴅᴍ/ɢʀᴏᴜᴘꜱ.")
