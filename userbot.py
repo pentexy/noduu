@@ -1,70 +1,70 @@
 import logging
-import re
 import os
+import re
 from telethon import TelegramClient, events
 from telethon.tl.functions.messages import SetTypingRequest
 from telethon.tl.types import SendMessageTypingAction, SendMessageRecordAudioAction
 
-# Logging setup
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-# Telegram credentials
+# === CONFIG ===
 API_ID = 26416419
 API_HASH = "c109c77f5823c847b1aeb7fbd4990cc4"
 SESSION_NAME = "forward_to_nezuko"
 
-# Initialize client and data stores
-client = TelegramClient(SESSION_NAME, API_ID, API_HASH)
-forward_map = {}
-pm_enabled = set()
-intro_sent = set()
+# === LOGGING ===
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
+# === CLIENT SETUP ===
+client = TelegramClient(SESSION_NAME, API_ID, API_HASH)
+
+# === STATE ===
+forward_map = {}  # Maps forwarded msg ID from bot -> (user_id, user_msg_id)
+pm_enabled = {}   # Per-user toggle: user_id -> True/False
+
+WELCOME_TEXT = (
+    "**ʏᴏᴜ ᴀʀᴇ ɴᴏᴡ ɢᴏɪɴɢ ᴛᴏ ᴛᴀʟᴋ ᴛᴏ ⧼ ᴠɪʀᴛᴜᴀʟ ʏᴏʀ ғᴏʀɢᴇʀ ⧽ — "
+    "ᴍɪɴᴅ ʏᴏᴜʀ ᴡᴏʀᴅs ʙᴇғᴏʀᴇ sᴘᴇᴀᴋɪɴɢ!**\n\n"
+    "⌬ **ᴜsᴇ /pm `off` || `on` ᴛᴏ ᴅɪsᴀʙʟᴇ ⊶ᴏʀ⊷ ᴇɴᴀʙʟᴇ ᴍᴇ.**"
+)
+
+# === HANDLE USER MESSAGES ===
 @client.on(events.NewMessage(incoming=True))
 async def handle_user_message(event):
-    if not event.is_private:
-        return
-
     sender = await event.get_sender()
-    if sender.bot:
+    if not event.is_private or sender.bot:
         return
 
     user_id = event.sender_id
     msg_text = event.raw_text.strip()
 
-    # Commands to toggle PM
+    # Check PM toggle
     if msg_text.lower() == "/pm off":
-        pm_enabled.discard(user_id)
-        await event.reply("**⛔ Virtual Yor PM Mode disabled.**")
+        pm_enabled[user_id] = False
+        await event.reply("Virtual Yor PM mode disabled.")
         logger.info(f"User {user_id} disabled PM mode.")
         return
     elif msg_text.lower() == "/pm on":
-        pm_enabled.add(user_id)
-        await event.reply("**✅ Virtual Yor PM Mode enabled.**")
+        pm_enabled[user_id] = True
+        await event.reply("Virtual Yor PM mode enabled.")
         logger.info(f"User {user_id} enabled PM mode.")
         return
 
-    # Send intro if not sent
-    if user_id not in intro_sent:
-        await event.reply(
-            "**ʏᴏᴜ ᴀʀᴇ ɴᴏᴡ ɢᴏɪɴɢ ᴛᴏ ᴛᴀʟᴋ ᴛᴏ ⧼ ᴠɪʀᴛᴜᴀʟ ʏᴏʀ ғᴏʀɢᴇʀ ⧽ — ᴍɪɴᴅ ʏᴏᴜʀ ᴡᴏʀᴅs ʙᴇғᴏʀᴇ sᴘᴇᴀᴋɪɴɢ!**\n\n"
-            "⌬ **ᴜsᴇ /pm `off` || `on` ᴛᴏ ᴅɪsᴀʙʟᴇ ⊶ᴏʀ⊷ ᴇɴᴀʙʟᴇ ᴍᴇ.**"
-        )
-        intro_sent.add(user_id)
-        pm_enabled.add(user_id)
+    if not pm_enabled.get(user_id, True):
         return
 
-    if user_id not in pm_enabled:
-        return
+    # Send welcome message on first contact
+    if user_id not in forward_map.values():
+        await event.reply(WELCOME_TEXT)
 
     try:
         fwd = await client.send_message("im_NezukoBot", msg_text)
-        forward_map[fwd.id] = user_id
-        logger.info(f"Forwarded to @im_NezukoBot from {user_id}")
+        forward_map[fwd.id] = (user_id, event.id)
+        logger.info(f"Forwarded message to @im_NezukoBot from {user_id}")
     except Exception as e:
         logger.error(f"Failed to forward: {e}")
-        await event.reply("Error forwarding to NezukoBot.")
+        await event.reply("Something went wrong forwarding your message.")
 
+# === HANDLE BOT RESPONSES ===
 @client.on(events.NewMessage(from_users="im_NezukoBot"))
 async def handle_bot_reply(event):
     try:
@@ -72,37 +72,44 @@ async def handle_bot_reply(event):
             return
 
         original = await event.get_reply_message()
-        user_id = forward_map.pop(original.id, None)
-        if not user_id:
+        user_info = forward_map.pop(original.id, None)
+        if not user_info:
             return
 
-        # Choose typing/recording action
+        user_id, user_msg_id = user_info
+
+        # Typing action
         if event.text:
             await client(SetTypingRequest(user_id, SendMessageTypingAction()))
         else:
             await client(SetTypingRequest(user_id, SendMessageRecordAudioAction()))
 
-        # Prepare text if any
+        # Text reply
         if event.text:
-            response_text = event.text.replace("Nezuko", "Yor")
-            if "Nezuko" in event.text:
-                logger.info("Replaced 'Nezuko' with 'Yor' in response.")
+            text = event.text
 
-            response_text = re.sub(r"@\w+", "@WingedAura", response_text)
-            if re.search(r"@\w+", event.text):
-                logger.info("Replaced username(s) with '@WingedAura'.")
+            if "Nezuko" in text:
+                logger.info("Replacing 'Nezuko' with 'Yor'")
+            text = text.replace("Nezuko", "Yor")
 
-            await client.send_message(user_id, response_text, reply_to=original.id)
+            if re.search(r"@\w+", text):
+                logger.info("Replacing usernames with '@WingedAura'")
+            text = re.sub(r"@\w+", "@WingedAura", text)
+
+            await client.send_message(user_id, text, reply_to=user_msg_id)
+
+        # Media reply
         elif event.media:
-            file_path = await event.download_media()
-            await client.send_file(user_id, file_path, reply_to=original.id)
-            os.remove(file_path)
+            path = await event.download_media()
+            await client.send_file(user_id, path, reply_to=user_msg_id)
+            os.remove(path)
 
         logger.info(f"Sent response to user {user_id}")
 
     except Exception as e:
         logger.error(f"Error in bot reply handler: {e}")
 
+# === RUN ===
 client.start()
-logger.info("Virtual Yor userbot is running.")
+logger.info("Bot is running...")
 client.run_until_disconnected()
