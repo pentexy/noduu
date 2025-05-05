@@ -36,7 +36,7 @@ except Exception as e:
 # Notify @uchiha.rar on start
 try:
     uchiha_id = cl.user_id_from_username("uchiha.rar")
-    cl.direct_send("ʏᴏᴜꜱᴇʀʙᴏᴛ ɪꜱ ꜱᴛᴀʀᴛᴇᴅ ᴀɴᴅ ʟɪᴠᴇ ✅", [uchiha_id])
+    cl.direct_send("ʙᴏᴛ ɪꜱ ꜱᴛᴀʀᴛᴇᴅ ᴀɴᴅ ʟɪᴠᴇ ✅", [uchiha_id])
     print("✅ ɴᴏᴛɪꜰɪᴇᴅ @uchiha.rar.")
 except Exception as e:
     print(f"❌ ɴᴏᴛɪꜰʏ ꜰᴀɪʟᴇᴅ: {e}")
