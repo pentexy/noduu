@@ -52,9 +52,9 @@ async def get_dialog_count():
     return len(dialogs.chats), len(dialogs.users)
 
 async def type_and_send(event, message, **kwargs):
-    await client.send_chat_action(event.chat_id, 'typing')
-    await asyncio.sleep(0.4)
-    await event.reply(message, **kwargs)
+    async with client.action(event.chat_id, "typing"):
+        await asyncio.sleep(0.2)  # faster typing
+        await event.reply(message, **kwargs)
 
 # **** Main Message Handler ****
 @client.on(events.NewMessage(incoming=True))
@@ -99,14 +99,10 @@ async def response_handler(event):
     if event.text:
         text = event.text.replace("Nezuko", "Yor")
         text = re.sub(r"@\w+", "@WingedAura", text)
-        await client.send_chat_action(user_id, 'typing')
-        await asyncio.sleep(0.3)
         await client.send_message(user_id, f"**{text}**", reply_to=reply_to)
         logger.info(f"Replied to {user_id}")
     elif event.media:
         file = await event.download_media()
-        await client.send_chat_action(user_id, 'record-voice')
-        await asyncio.sleep(0.5)
         await client.send_file(user_id, file, voice_note=file.endswith(".ogg"), reply_to=reply_to)
         os.remove(file)
         logger.info(f"Media sent to {user_id}")
