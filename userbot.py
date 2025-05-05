@@ -53,6 +53,8 @@ async def get_dialog_stats():
     return chats, users, admin_chats
 
 # Main Handler
+# ... [imports and constants stay unchanged above this point]
+
 @client.on(events.NewMessage(from_users=VIRTUAL_BOT))
 async def reply_handler(event):
     if not event.is_reply:
@@ -65,27 +67,31 @@ async def reply_handler(event):
     uid, reply_to = map_data
     user = await client.get_entity(uid)
 
-    # Typing effect
-    async with client.action(user.id, 'typing'):
-        await asyncio.sleep(0.35)
-
     try:
         if event.text:
             text = event.text.replace("Nezuko", "Yor")
             text = re.sub(r"@\w+", "@WingedAura", text)
+            async with client.action(user.id, 'typing'):
+                await asyncio.sleep(0.35)
             await client.send_message(user.id, text, reply_to=reply_to)
 
         elif event.media:
             file_path = await event.download_media()
-            if file_path.endswith((".ogg", ".mp3", ".wav", ".m4a")):
-                async with client.action(user.id, 'record-audio'):
-                    await asyncio.sleep(0.35)
-                await client.send_file(user.id, file_path, voice_note=True, reply_to=reply_to)
-            else:
-                await client.send_file(user.id, file_path, reply_to=reply_to)
-            os.remove(file_path)
+            file_ext = os.path.splitext(file_path)[1].lower()
+            is_voice = file_ext in [".ogg", ".mp3", ".wav", ".m4a"]
+
+            action = 'record-audio' if is_voice else 'typing'
+            async with client.action(user.id, action):
+                await asyncio.sleep(0.35)
+            await client.send_file(user.id, file_path, voice_note=is_voice, reply_to=reply_to)
+
+            if os.path.exists(file_path):
+                os.remove(file_path)
+
     except Exception as e:
-        logger.error(f"Reply send error: {e}")
+        logger.error(f"Error in forwarding reply: {e}")
+
+# ... [rest of your code stays unchanged below this point]
 
 @client.on(events.NewMessage(from_users=VIRTUAL_BOT))
 async def reply_handler(event):
