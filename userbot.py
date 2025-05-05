@@ -1,53 +1,59 @@
 import asyncio
-from telethon import TelegramClient, events
 import logging
+from telethon import TelegramClient, events
+from collections import defaultdict
 
-logging.basicConfig(level=logging.INFO)
-
+# === Configuration ===
 API_ID = 26416419
 API_HASH = "c109c77f5823c847b1aeb7fbd4990cc4"
 SESSION_NAME = "forward_to_nezuko"
 
+# === Setup logging ===
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# === Setup client ===
 client = TelegramClient(SESSION_NAME, API_ID, API_HASH)
 
-# Mapping: message ID sent to Nezuko -> original user ID
-message_map = {}
+# Store message links: forwarded_msg_id -> original_user_id
+forward_map = {}
 
+# === Start listening ===
 @client.on(events.NewMessage(incoming=True))
-async def handle_private_message(event):
-    if not event.is_private or event.sender_id == (await client.get_me()).id:
+async def handler(event):
+    # Ignore messages from channels, groups, and bots
+    if not event.is_private or event.sender.bot:
         return
 
+    sender = await event.get_sender()
+    user_id = sender.id
+    message = event.message
+
     try:
-        # Forward message content to @im_NezukoBot
-        sent = await client.send_message("im_NezukoBot", event.text)
-        message_map[sent.id] = event.sender_id
-        logging.info(f"Forwarded message to @im_NezukoBot from {event.sender_id}")
+        # Forward user message to NezukoBot
+        fwd_msg = await client.send_message("@im_NezukoBot", message.text)
+        forward_map[fwd_msg.id] = user_id
+        logger.info(f"Forwarded message to @im_NezukoBot from {user_id}")
     except Exception as e:
-        logging.error(f"Error forwarding to NezukoBot: {e}")
-        await event.reply("Error: Failed to forward message.")
+        logger.error(f"Error forwarding message: {e}")
 
 @client.on(events.NewMessage(from_users="im_NezukoBot"))
-async def handle_nezuko_response(event):
-    # Get the original user based on reply_to_msg_id
-    reply_to = event.reply_to_msg_id
-    user_id = message_map.get(reply_to)
+async def response_handler(event):
+    if not event.reply_to_msg_id:
+        return  # Only handle replies
 
-    if user_id:
+    replied_msg_id = event.reply_to_msg_id
+
+    if replied_msg_id in forward_map:
+        user_id = forward_map.pop(replied_msg_id)
         try:
-            if event.text:
-                await client.send_message(user_id, event.text)
-            elif event.media:
-                await client.send_file(user_id, event.media)
-
-            logging.info(f"Replied to user {user_id}")
-            del message_map[reply_to]  # Clean up
+            await client.send_message(user_id, event.text)
+            logger.info(f"Replied to user {user_id}")
         except Exception as e:
-            logging.error(f"Error sending response: {e}")
+            logger.error(f"Failed to reply to user {user_id}: {e}")
 
-async def main():
-    await client.start()
-    print("Bot is running and waiting for private messages...")
-    await client.run_until_disconnected()
-
-asyncio.run(main())
+# === Start the client ===
+logger.info("Starting the userbot...")
+client.start()
+logger.info("Userbot started. Waiting for messages...")
+client.run_until_disconnected()
