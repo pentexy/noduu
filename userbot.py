@@ -64,10 +64,10 @@ async def get_dialog_stats():
             users += 1
     return chats, users, admin_chats
 
-async def type_and_send(event, text):
-    async with client.action(event.chat_id, 'typing'):
-        await asyncio.sleep(0.2)
-        await event.reply(text, link_preview=False)
+async def type_and_send(chat_id, text):
+    async with client.action(chat_id, 'typing'):
+        await asyncio.sleep(1)
+        await client.send_message(chat_id, text, parse_mode='md')
 
 async def record_and_send(event, file, reply_to):
     async with client.action(event.chat_id, 'record-audio'):
@@ -109,7 +109,8 @@ async def reply_handler(event):
     if event.text:
         text = event.text.replace("Nezuko", "Yor")
         text = re.sub(r"@\w+", "@WingedAura", text)
-        await type_and_send(await client.get_entity(uid), f"**{text}**")
+        user = await client.get_entity(uid)
+await type_and_send(user.id, f"**{text}**")
     elif event.media:
         file = await event.download_media()
         await record_and_send(await client.get_entity(uid), file, reply_to)
