@@ -170,7 +170,7 @@ async def command_handler(event):
         )
 
 
-elif cmd == "broadcast":
+ elif cmd == "broadcast":
     if event.reply_to_msg_id:
         reply_msg = await event.get_reply_message()
         count = 0
