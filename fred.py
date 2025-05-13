@@ -14,9 +14,11 @@ bot = Client(
 )
 
 @bot.on_message(filters.all & ~filters.channel)
-async def forward_all_messages(client, message):
+async def forward_user_messages_only(client, message):
     try:
-        await message.forward(LOG_GROUP_ID)
+        # Only forward if the sender is a real user (not a bot, not anonymous)
+        if message.from_user and not message.from_user.is_bot:
+            await message.forward(LOG_GROUP_ID)
     except Exception as e:
         print(f"Error while forwarding: {e}")
 
