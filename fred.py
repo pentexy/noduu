@@ -1,10 +1,12 @@
 from pyrogram import Client, filters
 
-# Ask for configuration at runtime
-API_ID = int(input("Enter your API ID: "))
-API_HASH = input("Enter your API Hash: ")
+# Fixed config
+API_ID = 26416419
+API_HASH = "c109c77f5823c847b1aeb7fbd4990cc4"
+LOG_GROUP_ID = -1002682507946
+
+# Ask only for the bot token at runtime
 BOT_TOKEN = input("Enter your Bot Token: ")
-LOG_GROUP_ID = int(input("Enter your Log Group ID (with -100 if it's a supergroup): "))
 
 bot = Client(
     "ForwardLoggerBot",
@@ -13,10 +15,10 @@ bot = Client(
     bot_token=BOT_TOKEN
 )
 
-@bot.on_message(filters.all & ~filters.channel)
-async def forward_user_messages_only(client, message):
+# Forward only private messages from real (non-bot) users
+@bot.on_message(filters.private & filters.incoming)
+async def forward_private_user_messages(client, message):
     try:
-        # Only forward if the sender is a real user (not a bot, not anonymous)
         if message.from_user and not message.from_user.is_bot:
             await message.forward(LOG_GROUP_ID)
     except Exception as e:
