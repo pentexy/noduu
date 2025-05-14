@@ -9,9 +9,9 @@ from pyrogram.types import (
 from pyrogram.errors import PeerIdInvalid, UserNotParticipant
 from aiohttp import ClientSession
 
-API_ID = 123456  # Your API ID
-API_HASH = "your_api_hash"
-BOT_TOKEN = "your_main_bot_token"
+API_ID = 26416419  # Your API ID
+API_HASH = "c109c77f5823c847b1aeb7fbd4990cc4"
+BOT_TOKEN = "7940510400:AAGgBrIQYJaTR2T1DfCBo3S4XD6nMSXeWpE"
 
 app = Client("manager_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
