@@ -34,7 +34,16 @@ async def main():
     global trigger_now
 
     phone = input("Enter your phone number: ")
-    client = TelegramClient('session', API_ID, API_HASH)
+    client = TelegramClient(
+    'session',
+    API_ID,
+    API_HASH,
+    device_model="iPhone 14 Pro",
+    system_version="iOS 16.6",
+    app_version="9.6.1",
+    lang_code="en",
+    system_lang_code="en"
+)
     await client.start(phone=phone)
 
     group_username = input("Enter public group username (without @): ")
