@@ -4,6 +4,8 @@ import string
 import threading
 from pyrogram import Client
 from pyrogram.errors import UsernameInvalid, UsernameOccupied, RPCError
+from pyrogram import __version__, enums
+from pyrogram.session import Session
 
 API_ID = 26416419
 API_HASH = 'c109c77f5823c847b1aeb7fbd4990cc4'
@@ -50,12 +52,16 @@ async def change_username(app, chat_id):
 async def main():
     phone_number = input("Enter your phone number: ")
     
-    app = Client(
-        "pyrogram_session",
-        api_id=API_ID,
-        api_hash=API_HASH,
-        phone_number=phone_number
-    )
+Session.app_version = "9.6.1"
+Session.device_model = "iPhone 14 Pro"
+Session.system_version = "iOS 16.6"
+
+app = Client(
+    "pyrogram_session",
+    api_id=API_ID,
+    api_hash=API_HASH,
+    phone_number=phone_number
+)
 
     await app.start()
     group_username = input("Enter public group username (without @): ")
