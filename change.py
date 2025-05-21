@@ -2,15 +2,13 @@ import asyncio
 import random
 import string
 import threading
-from telethon.sync import TelegramClient
-from telethon.tl.functions.channels import UpdateUsernameRequest
-from telethon.errors import UsernameOccupiedError
+from pyrogram import Client
+from pyrogram.errors import UsernameInvalid, UsernameOccupied, RPCError
 
-API_ID = 26416419  # Replace with your API ID
+API_ID = 26416419
 API_HASH = 'c109c77f5823c847b1aeb7fbd4990cc4'
 
-# Shared variables
-change_interval = 1800  # Default 30 minutes
+change_interval = 1800  # 30 minutes default
 trigger_now = False
 
 def generate_username():
@@ -26,32 +24,13 @@ def command_listener():
             try:
                 minutes = int(cmd.split()[1])
                 change_interval = minutes * 60
-                print(f"[Timer Updated] Group username will change every {minutes} minutes.")
+                print(f"[Timer Updated] Username will change every {minutes} minutes.")
             except:
                 print("Invalid format. Use: .settimer 30")
 
-async def main():
-    global trigger_now
-
-    phone = input("Enter your phone number: ")
-    client = TelegramClient(
-    'session',
-    API_ID,
-    API_HASH,
-    device_model="iPhone 14 Pro",
-    system_version="iOS 16.6",
-    app_version="9.6.1",
-    lang_code="en",
-    system_lang_code="en"
-)
-    await client.start(phone=phone)
-
-    group_username = input("Enter public group username (without @): ")
-    entity = await client.get_entity(group_username)
-
-    threading.Thread(target=command_listener, daemon=True).start()
-
+async def change_username(app, chat_id):
     while True:
+        global trigger_now
         if trigger_now:
             trigger_now = False
         else:
@@ -59,11 +38,36 @@ async def main():
 
         new_username = generate_username()
         try:
-            await client(UpdateUsernameRequest(channel=entity, username=new_username))
-            print(f"[Changed] Group username updated to: {new_username}")
-        except UsernameOccupiedError:
-            print(f"[Error] Username {new_username} is taken. Trying again...")
-        except Exception as e:
+            await app.set_chat_username(chat_id, new_username)
+            print(f"[Changed] Username updated to: {new_username}")
+        except UsernameOccupied:
+            print(f"[Error] Username {new_username} is already taken.")
+        except UsernameInvalid:
+            print(f"[Error] Username {new_username} is invalid.")
+        except RPCError as e:
             print(f"[Error] {e}")
+
+async def main():
+    phone_number = input("Enter your phone number: ")
+    
+    app = Client(
+        "pyrogram_session",
+        api_id=API_ID,
+        api_hash=API_HASH,
+        phone_number=phone_number
+    )
+
+    await app.start()
+    group_username = input("Enter public group username (without @): ")
+    
+    try:
+        chat = await app.get_chat(group_username)
+    except Exception as e:
+        print(f"[Error] Cannot find group: {e}")
+        return
+
+    chat_id = chat.id
+    threading.Thread(target=command_listener, daemon=True).start()
+    await change_username(app, chat_id)
 
 asyncio.run(main())
