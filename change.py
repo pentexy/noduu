@@ -6,8 +6,8 @@ from telethon.sync import TelegramClient
 from telethon.tl.functions.channels import UpdateUsernameRequest
 from telethon.errors import UsernameOccupiedError
 
-API_ID = 123456  # Replace with your API ID
-API_HASH = 'your_api_hash_here'
+API_ID = 26416419  # Replace with your API ID
+API_HASH = 'c109c77f5823c847b1aeb7fbd4990cc4'
 
 # Shared variables
 change_interval = 1800  # Default 30 minutes
