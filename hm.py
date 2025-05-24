@@ -4,7 +4,7 @@ from datetime import datetime
 
 API_ID = 26416419
 API_HASH = "c109c77f5823c847b1aeb7fbd4990cc4"
-BOT_TOKEN = "8195870572:AAHazCr8nflbGgkQdtbgbbNyjmEiPBY3bZo"
+BOT_TOKEN = "8190514719:AAErWkT2S9CnXskl33bw1AC3_DBt17L3R1I"
 
 app = Client("durga_puja_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
