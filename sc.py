@@ -2,8 +2,8 @@ import asyncio
 from telethon import TelegramClient, events, functions
 import time
 
-API_ID = 26416419  # <-- Replace with your API ID
-API_HASH = "c109c77f5823c847b1aeb7fbd4990cc4"  # <-- Replace with your API HASH
+API_ID = 23716755  # <-- Replace with your API ID
+API_HASH = "5503b68991d161b6863dba06ff28fcb0"  # <-- Replace with your API HASH
 OWNER_ID = 6748827895  # <-- Replace with your Telegram numeric ID
 
 client = TelegramClient("user_session", API_ID, API_HASH)
