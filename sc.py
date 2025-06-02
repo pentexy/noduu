@@ -6,7 +6,7 @@ from pyrogram.raw.functions.contacts import Search
 
 API_ID = 26416419  # Replace with your API ID
 API_HASH = "c109c77f5823c847b1aeb7fbd4990cc4"  # Replace with your API HASH
-OWNER_ID = 6748827895  # Replace with your Telegram numeric ID
+OWNER_ID = 6748827895  # Replace with your Telegram user ID
 
 app = Client("user_session", api_id=API_ID, api_hash=API_HASH)
 
@@ -33,7 +33,7 @@ async def search_bot_periodically():
                         break
             except Exception as e:
                 print(f"[ERROR] During periodic search: {e}")
-        await asyncio.sleep(1800)  # wait 30 minutes
+        await asyncio.sleep(1800)  # 30 minutes
 
 
 @app.on_message(filters.private & filters.user(OWNER_ID) & filters.command("lock", prefixes="."))
@@ -41,13 +41,12 @@ async def lock_handler(client: Client, message: Message):
     global lock_keyword, bot_username, search_task_running
 
     if len(message.command) < 2:
-        await message.reply("Please provide a keyword.\nUsage: `.lock your_keyword`")
+        await message.reply("❗ Please provide a keyword.\nUsage: `.lock your_keyword`")
         return
 
     lock_keyword = message.command[1]
-    await message.reply("🔎 Enter bot username to track (without @):")
+    await message.reply("🔍 Now send the bot username to track (without @):")
 
-    # Wait for username
     try:
         response = await app.listen(OWNER_ID, timeout=60)
         bot_username = response.text.strip().lstrip("@")
@@ -59,13 +58,13 @@ async def lock_handler(client: Client, message: Message):
             asyncio.create_task(search_bot_periodically())
 
     except asyncio.TimeoutError:
-        await message.reply("⏰ Timeout. Please start again using `.lock`")
+        await message.reply("⏰ Timeout. Please try again using `.lock`")
 
 
 @app.on_message(filters.private & filters.user(OWNER_ID) & filters.command("t", prefixes="."))
 async def temp_search_handler(client: Client, message: Message):
     if len(message.command) < 2:
-        await message.reply("Please provide a keyword.\nUsage: `.t your_keyword`")
+        await message.reply("❗ Please provide a keyword.\nUsage: `.t your_keyword`")
         return
 
     temp_keyword = message.command[1]
@@ -80,16 +79,23 @@ async def temp_search_handler(client: Client, message: Message):
                 reply += f"- {name} | {username}\n"
             await message.reply(reply)
         else:
-            await message.reply("No users found for that keyword.")
+            await message.reply("❌ No users found for that keyword.")
     except Exception as e:
         print(f"[ERROR] Temp search: {e}")
         await message.reply(f"Error during search: {e}")
 
 
+@app.on_message(filters.private & filters.user(OWNER_ID))
+async def catch_all(client: Client, message: Message):
+    # For debugging unknown messages
+    print(f"[RECEIVED] {message.text}")
+
+
 async def main():
     await app.start()
-    print("[✅  LOGGED IN]")
-    await asyncio.Event().wait()  # Keeps it alive like .idle()
+    print("[✅ LOGGED IN]")
+    await app.send_message(OWNER_ID, "✅ I'm started sir!")  # Auto notify
+    await asyncio.Event().wait()  # Keep script running
 
 
 if __name__ == "__main__":
