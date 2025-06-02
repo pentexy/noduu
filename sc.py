@@ -94,7 +94,6 @@ async def catch_all(client: Client, message: Message):
 async def main():
     await app.start()
     print("[✅ LOGGED IN]")
-    await app.send_message(OWNER_ID, "✅ I'm started sir!")  # Auto notify
     await asyncio.Event().wait()  # Keep script running
 
 
