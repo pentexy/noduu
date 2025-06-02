@@ -72,8 +72,8 @@ async def temp_search_command(client, message):
 
 async def main():
     await app.start()
-    print("[✅ LOGGED IN]")
-    await app.idle()
+    print("[✅  LOGGED IN]")
+    app.idle()
 
 if __name__ == "__main__":
     asyncio.run(main())
