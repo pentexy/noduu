@@ -1,85 +1,79 @@
 import asyncio
-from telethon import TelegramClient, events, functions
-import time
+from pyrogram import Client, filters
+from pyrogram.raw.functions.contacts import Search
+import os
 
-API_ID = 23716755  # <-- Replace with your API ID
-API_HASH = "5503b68991d161b6863dba06ff28fcb0"  # <-- Replace with your API HASH
-OWNER_ID = 6748827895  # <-- Replace with your Telegram numeric ID
-
-client = TelegramClient("user_session", API_ID, API_HASH)
+API_ID = 26416419  # Replace with your API ID
+API_HASH = "c109c77f5823c847b1aeb7fbd4990cc4"  # Replace with your API Hash
+OWNER_ID = 6748827895  # Replace with your Telegram user ID
 
 lock_keyword = None
 bot_username = None
-search_task_running = False
+search_task_started = False
+
+app = Client("user_session", api_id=API_ID, api_hash=API_HASH)
 
 
-async def search_bot_periodically():
-    global search_task_running
+async def periodic_search():
+    global lock_keyword, bot_username, search_task_started
     while True:
         if lock_keyword and bot_username:
-            print(f"[SEARCH] Searching keyword: {lock_keyword}")
+            print(f"[SEARCHING] For keyword: {lock_keyword}")
             try:
-                result = await client(functions.contacts.SearchRequest(
-                    q=lock_keyword,
-                    limit=20
-                ))
+                result = await app.invoke(Search(q=lock_keyword, limit=20))
                 for user in result.users:
                     if user.username and user.username.lower() == bot_username.lower():
+                        print(f"[FOUND] Bot @{bot_username} is ranked!")
                         for _ in range(10):
-                            await client.send_message(OWNER_ID, "your bot is now ranked sir !! Congratulations 🎉!")
+                            await app.send_message(OWNER_ID, "your bot is now ranked sir !! Congratulations 🎉!")
                         lock_keyword = None
                         bot_username = None
-                        print("[RANK DETECTED] Notification sent!")
                         break
             except Exception as e:
-                print(f"[ERROR] During search: {e}")
-        await asyncio.sleep(1800)  # Wait 30 mins
+                print(f"[ERROR] During periodic search: {e}")
+        await asyncio.sleep(1800)  # 30 minutes
 
 
-@client.on(events.NewMessage(from_users=OWNER_ID))
-async def handle_commands(event):
-    global lock_keyword, bot_username, search_task_running
+@app.on_message(filters.private & filters.user(OWNER_ID) & filters.command("lock", prefixes="."))
+async def lock_command(client, message):
+    global lock_keyword, bot_username, search_task_started
+    try:
+        lock_keyword = message.text.split(" ", 1)[1].strip()
+        await message.reply("Enter bot username (without @):")
+        print(f"[LOCKED] Keyword set: {lock_keyword}")
 
-    message = event.raw_text.strip()
+        response = await app.listen(OWNER_ID)
+        bot_username = response.text.strip().lstrip("@")
+        await message.reply(f"Tracking @{bot_username} for keyword '{lock_keyword}'...")
 
-    if message.startswith(".lock "):
-        lock_keyword = message.split(" ", 1)[1].strip()
-        await event.respond("Enter bot username:")
-        print(f"[LOCK] Keyword set: {lock_keyword}")
+        if not search_task_started:
+            search_task_started = True
+            asyncio.create_task(periodic_search())
 
-        response = await client.wait_for(events.NewMessage(from_users=OWNER_ID))
-        bot_username = response.raw_text.strip().lstrip("@")
-        await event.respond(f"Monitoring started for @{bot_username} using keyword '{lock_keyword}'...")
-        print(f"[BOT USERNAME] Tracking @{bot_username}")
+    except IndexError:
+        await message.reply("Usage: .lock <keyword>")
 
-        if not search_task_running:
-            search_task_running = True
-            asyncio.create_task(search_bot_periodically())
 
-    elif message.startswith(".t "):
-        temp_keyword = message.split(" ", 1)[1].strip()
-        print(f"[TEMP SEARCH] Performing search for: {temp_keyword}")
-        try:
-            result = await client(functions.contacts.SearchRequest(q=temp_keyword, limit=3))
-            if result.users:
-                reply = "**Top 3 results:**\n"
-                for user in result.users:
-                    name = f"{user.first_name or ''} {user.last_name or ''}".strip()
-                    username = f"@{user.username}" if user.username else "(no username)"
-                    reply += f"- {name} | {username}\n"
-                await event.respond(reply)
-            else:
-                await event.respond("No users found for that keyword.")
-        except Exception as e:
-            await event.respond(f"Error during search: {e}")
-            print(f"[ERROR] Temp search: {e}")
+@app.on_message(filters.private & filters.user(OWNER_ID) & filters.command("t", prefixes="."))
+async def temp_search_command(client, message):
+    try:
+        keyword = message.text.split(" ", 1)[1].strip()
+        result = await app.invoke(Search(q=keyword, limit=3))
+        reply = "**Top 3 results:**\n"
+        for user in result.users:
+            name = (user.first_name or "") + " " + (user.last_name or "")
+            uname = f"@{user.username}" if user.username else "(no username)"
+            reply += f"- {name.strip()} | {uname}\n"
+        await message.reply(reply)
+    except Exception as e:
+        await message.reply(f"Error: {e}")
+        print(f"[ERROR] Instant search: {e}")
 
 
 async def main():
-    await client.start()
-    print("[LOGGED IN] Telegram session active.")
-    await client.run_until_disconnected()
-
+    await app.start()
+    print("[✅ LOGGED IN]")
+    await app.idle()
 
 if __name__ == "__main__":
     asyncio.run(main())
