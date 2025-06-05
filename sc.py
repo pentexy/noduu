@@ -47,7 +47,7 @@ async def handle_callback(client, callback_query):
         await callback_query.message.edit_text("🗞️ Latest Crypto News Coming Soon!")
     elif data == "about":
         await callback_query.answer()
-        await callback_query.message.edit_text("ℹ️ This bot is controlled by the owner to share crypto news & updates.")
+        await callback_query.message.edit_text("ℹ️ This bot is made for share crypto news & updates.")
 
 @app.on_message(filters.private & filters.user(OWNER_ID))
 async def owner_panel(client, message):
