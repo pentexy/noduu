@@ -156,7 +156,7 @@ class BotManagerBot:
             logger.error(f"Error running bot: {e}")
 
 async def main():
-    bot_manager = BotManagerBot("8160725444:AAHBXpoiU60sx5F0E8fxXb_KgaXnA4saOOo")
+    bot_manager = BotManagerBot("7751342718:AAEkyzlvQ790jnLTsL1NvHYMBQqE9GTUAes")
     await bot_manager.run()
 
 if __name__ == "__main__":
