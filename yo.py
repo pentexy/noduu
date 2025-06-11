@@ -14,12 +14,29 @@ async def remove_bot_dp():
     )
 
     async with app:
-        photos = await app.get_profile_photos("me")
-        if photos.total_count == 0:
+        # Get current profile photos
+        photos = await app.invoke(
+            app._client.functions.photos.GetUserPhotos(
+                user_id="me",
+                offset=0,
+                max_id=0,
+                limit=1
+            )
+        )
+
+        if not photos.photos:
             print("❌ Bot has no profile picture.")
-        else:
-            await app.delete_profile_photos(photos.photos[0].file_id)
-            print("✅ Bot's profile picture has been removed.")
+            return
+
+        # Delete the first profile photo
+        photo_id = photos.photos[0].id
+        await app.invoke(
+            app._client.functions.photos.DeletePhotos(
+                id=[photos.photos[0].id]
+            )
+        )
+
+        print("✅ Bot's profile picture has been removed.")
 
 if __name__ == "__main__":
     asyncio.run(remove_bot_dp())
