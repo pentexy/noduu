@@ -7,7 +7,10 @@ API_ID = 26416419
 API_HASH = "c109c77f5823c847b1aeb7fbd4990cc4"
 
 async def download_image(url: str):
-    async with aiohttp.ClientSession() as session:
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/114.0.0.0 Safari/537.36"
+    }
+    async with aiohttp.ClientSession(headers=headers) as session:
         async with session.get(url) as resp:
             if resp.status != 200:
                 raise Exception(f"Failed to download image. Status: {resp.status}")
