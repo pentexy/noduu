@@ -1,76 +1,80 @@
+import re
+import httpx
+from getpass import getpass
 from pyrogram import Client, filters
-from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-import sqlite3
-import asyncio
-from datetime import datetime
-import getpass
+from pyrogram.types import Message
 
-# Ask for bot token in terminal
-BOT_TOKEN = getpass.getpass("Enter your bot token: ")
-API_ID = 26416419  # Replace with your actual api_id
-API_HASH = "c109c77f5823c847b1aeb7fbd4990cc4"  # Replace with your actual api_hash
-OWNER_ID = 6748827895  # Replace with your Telegram user ID
+# --- Ask credentials in terminal ---
+print("🔐 Enter your Telegram bot credentials:")
+api_id = int(input("📲 API ID: "))
+api_hash = input("🔑 API Hash: ")
+bot_token = getpass("🤖 Bot Token: ")  # hidden input
 
-app = Client("bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
+app = Client("insta_bot_session", api_id=api_id, api_hash=api_hash, bot_token=bot_token)
 
-# Database setup
-conn = sqlite3.connect("users.db")
-cur = conn.cursor()
-cur.execute("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY)")
-conn.commit()
+# --- Constants ---
+API_URL = "https://www.alphaapis.org/Instagram/dl/v1"
+INSTAGRAM_REGEX = r"(https?://(?:www\.)?instagram\.com/[^\s]+)"
 
-def add_user(user_id):
-    cur.execute("INSERT OR IGNORE INTO users (id) VALUES (?)", (user_id,))
-    conn.commit()
+@app.on_message(filters.text & filters.group)
+async def insta_auto_fetch(client: Client, message: Message):
+    match = re.search(INSTAGRAM_REGEX, message.text)
+    if not match:
+        return
 
-def get_all_users():
-    cur.execute("SELECT id FROM users")
-    return [row[0] for row in cur.fetchall()]
+    instagram_url = match.group(1)
+    processing = await message.reply_text("🔄")
 
-@app.on_message(filters.command("start"))
-async def start(client, message):
-    add_user(message.from_user.id)
-    buttons = InlineKeyboardMarkup([
-        [InlineKeyboardButton("📈 Crypto News", callback_data="crypto_news"),
-         InlineKeyboardButton("ℹ️ About", callback_data="about")]
-    ])
-    await message.reply_text(
-        "👋 Hello Sir\n#Crypto #Ton #NOTCOIN #Durov",
-        reply_markup=buttons
-    )
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as http:
+            resp = await http.get(API_URL, params={"url": instagram_url})
+            resp.raise_for_status()
+            data = await resp.json()
 
-@app.on_callback_query()
-async def handle_callback(client, callback_query):
-    data = callback_query.data
-    if data == "crypto_news":
-        await callback_query.answer()
-        await callback_query.message.edit_text("🗞️ Latest Crypto News Coming Soon!")
-    elif data == "about":
-        await callback_query.answer()
-        await callback_query.message.edit_text("ℹ️ This bot is made for share crypto news & updates.")
+        results = data.get("result", [])
+        if not results:
+            return await processing.edit("⚠️ No media found.")
 
-@app.on_message(filters.private & filters.user(OWNER_ID))
-async def owner_panel(client, message):
-    text = message.text
-    if text == "/users":
-        users = get_all_users()
-        await message.reply(f"👥 Total Users: {len(users)}")
-    elif text == "/list":
-        users = get_all_users()
-        await message.reply_text("🧾 User List:\n" + "\n".join([str(u) for u in users]))
-    elif text.startswith("/broadcast "):
-        msg = text.split(" ", 1)[1]
-        users = get_all_users()
-        success = 0
-        fail = 0
-        for uid in users:
-            try:
-                await client.send_message(uid, msg)
-                success += 1
-            except:
-                fail += 1
-        await message.reply(f"✅ Sent: {success}\n❌ Failed: {fail}")
-    else:
-        await message.reply("📌 Commands:\n/users – Show user count\n/list – List users\n/broadcast <msg> – Broadcast to all users")
+        # Reply caption logic
+        if message.reply_to_message and message.reply_to_message.from_user:
+            username = message.reply_to_message.from_user.username
+            if username:
+                mention_line = f"**ye dekh bc @{username}**"
+            else:
+                mention_line = f"**ye dekh bhai {message.reply_to_message.from_user.first_name}**"
+        else:
+            mention_line = f"**dekh le bc ye @{message.from_user.username or message.from_user.first_name}**"
 
+        caption = f"{mention_line}\n**ʙᴏᴛ ʙʏ [ᴛ.ᴍᴇ/EᴛᴇʀɴᴀʟAᴜʀᴀ](https://t.me/EternalAura)**"
+        reply_id = message.reply_to_message.message_id if message.reply_to_message else message.id
+
+        for item in results:
+            dl = item.get("downloadLink")
+            if not dl:
+                continue
+
+            if ".mp4" in dl:
+                await client.send_video(
+                    chat_id=message.chat.id,
+                    video=dl,
+                    reply_to_message_id=reply_id,
+                    caption=caption,
+                    parse_mode="markdown"
+                )
+            elif any(dl.endswith(ext) for ext in [".jpg", ".jpeg", ".png", ".webp"]):
+                await client.send_photo(
+                    chat_id=message.chat.id,
+                    photo=dl,
+                    reply_to_message_id=reply_id,
+                    caption=caption,
+                    parse_mode="markdown"
+                )
+
+    except Exception as e:
+        await processing.edit(f"❌ Error: {e}")
+    finally:
+        await processing.delete()
+
+# --- Run the bot ---
+print("\n🚀 Starting bot... Press Ctrl+C to stop.")
 app.run()
