@@ -33,11 +33,6 @@ async def start_handler(client, message: Message):
     )
 
 
-@bot.on_message(filters.text & ~filters.command(["start"]))
-async def normal_text(client, message: Message):
-    await message.reply("**crypto**")
-
-
 @bot.on_message(filters.command("panel") & filters.user(OWNER_ID))
 async def owner_panel(client, message: Message):
     total = users_collection.count_documents({})
