@@ -84,5 +84,12 @@ async def handle_broadcast(client, message: Message):
         await message.reply(f"✅ Broadcast Done\n\n✅ Sent: {total}\n❌ Failed: {failed}")
 
 
+# Handle any normal text (non-command) in private chats
+@bot.on_message(filters.private & filters.text & ~filters.command(["start", "panel"]))
+async def handle_non_command_dm(client, message: Message):
+    if not message.text.startswith("/"):
+        await message.reply("**Okay Sir!**")
+
+
 print("🚀 Bot is starting...")
 bot.run()
