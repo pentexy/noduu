@@ -94,7 +94,7 @@ async def handle_broadcast(client, message: Message):
 @bot.on_message(filters.private & filters.text & ~filters.command(["start", "panel"]))
 async def handle_non_command_dm(client, message: Message):
     if not message.text.startswith("/"):
-        await message.reply("**Okay Sir!**")
+        await message.reply("")
 
 print("🚀 Bot is starting...")
 bot.run()
