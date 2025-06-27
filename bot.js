@@ -322,6 +322,8 @@ async function startFarming() {
   bot.chat('🌾 Farming mode enabled.');
 
   const mcData = require('minecraft-data')(bot.version);
+  const Vec3 = require('vec3');
+
   const wheatID = mcData.blocksByName.wheat.id;
   const seedID = mcData.itemsByName.wheat_seeds.id;
   const craftingTableID = mcData.blocksByName.crafting_table.id;
@@ -333,7 +335,7 @@ async function startFarming() {
     try {
       // 1. Find grown wheat
       const wheat = bot.findBlock({
-        matching: b => b && b.type === wheatID && b.metadata === 7,
+        matching: b => b.type === wheatID && b.metadata === 7,
         maxDistance: 6
       });
 
@@ -346,7 +348,6 @@ async function startFarming() {
       // 2. Replant seeds
       const farmland = bot.findBlock({
         matching: block => {
-          if (!block) return false;
           const above = bot.blockAt(block.position.offset(0, 1, 0));
           return block.name === 'farmland' && above && above.name === 'air';
         },
@@ -372,18 +373,35 @@ async function startFarming() {
         bot.chat('🍞 Crafted bread.');
       }
 
+      // 4. Deposit bread in chest
+      const chestBlock = bot.findBlock({
+        matching: block => block.name.includes('chest'),
+        maxDistance: 6
+      });
+
+      if (chestBlock) {
+        const breadItem = bot.inventory.items().find(i => i.name === 'bread');
+        if (breadItem) {
+          await bot.pathfinder.goto(new goals.GoalBlock(chestBlock.position.x, chestBlock.position.y, chestBlock.position.z));
+          const chest = await bot.openChest(chestBlock);
+          await chest.deposit(breadItem.type, null, breadItem.count);
+          await chest.close();
+          bot.chat('📦 Deposited bread into chest.');
+        }
+      }
+
     } catch (err) {
-      bot.chat('⚠️ Farming error: ' + err.message);
+      bot.chat('❌ Farming error: ' + err.message);
     }
 
-  }, 5000);
+  }, 10000); // every 10 seconds
 }
 
 function stopFarming() {
   if (!farmingActive) return;
   farmingActive = false;
   clearInterval(farmingInterval);
-  bot.chat('🛑 Farming mode disabled.');
+  bot.chat('🚫 Farming mode disabled.');
 }
 
 
