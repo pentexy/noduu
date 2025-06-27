@@ -312,37 +312,20 @@ bot.on('time', () => {
 });
 
 // ====== Farming Module ======
-// ====== Farming Module ======
+/// ====== Farming Module ======
 let farmingActive = false;
 let farmingInterval = null;
 
-function startFarming() {
-  if (farmingActive) return;
-  farmingActive = true;
-  bot.chat('🌾 Farming mode enabled.');
-
-  farmingInterval = setInterval(() => {
-    if (farmingActive) farmingTask();
-  }, 10000);
-}
-
-function stopFarming() {
+async function farmingLoop() {
   if (!farmingActive) return;
-  clearInterval(farmingInterval);
-  farmingActive = false;
-  bot.chat('❌ Farming mode disabled.');
-}
 
-async function farmingTask() {
+  const mcData = require('minecraft-data')(bot.version);
+  const wheatID = mcData.blocksByName.wheat.id;
+  const seedID = mcData.itemsByName.wheat_seeds.id;
+  const craftingTableID = mcData.blocksByName.crafting_table.id;
+  const breadRecipe = bot.recipesFor(mcData.itemsByName.bread.id, null, 1, null)[0];
+
   try {
-    const mcData = require('minecraft-data')(bot.version);
-    const Vec3 = require('vec3');
-
-    const wheatID = mcData.blocksByName.wheat.id;
-    const seedID = mcData.itemsByName.wheat_seeds.id;
-    const craftingTableID = mcData.blocksByName.crafting_table.id;
-    const breadRecipe = bot.recipesFor(mcData.itemsByName.bread.id, null, 1, null)[0];
-
     // 1. Find grown wheat
     const wheat = bot.findBlock({
       matching: b => b.type === wheatID && b.metadata === 7,
@@ -383,7 +366,7 @@ async function farmingTask() {
       bot.chat('🍞 Crafted bread.');
     }
 
-    // 4. Deposit bread in chest
+    // 4. Deposit bread in nearby chest
     const chestBlock = bot.findBlock({
       matching: block => block.name.includes('chest'),
       maxDistance: 6
@@ -391,20 +374,32 @@ async function farmingTask() {
 
     if (chestBlock) {
       const chest = await bot.openChest(chestBlock);
-      const breadItem = bot.inventory.items().find(i => i.name === 'bread');
-      if (breadItem) {
-        await chest.deposit(breadItem.type, null, breadItem.count);
-        bot.chat('📦 Stored bread in chest.');
+      const bread = bot.inventory.items().find(i => i.name === 'bread');
+      if (bread) {
+        await chest.deposit(bread.type, null, bread.count);
+        bot.chat('📦 Deposited bread in chest.');
       }
       chest.close();
     }
-
   } catch (err) {
-    bot.chat('❌ Farming error: ' + err.message);
+    console.log("Farming error:", err);
   }
+
+  // Schedule next loop
+  if (farmingActive) setTimeout(farmingLoop, 5000);
 }
 
+function startFarming() {
+  if (farmingActive) return;
+  farmingActive = true;
+  bot.chat('🌾 Farming mode enabled.');
+  farmingLoop(); // start first loop
+}
 
+function stopFarming() {
+  farmingActive = false;
+  bot.chat('❌ Farming mode disabled.');
+}
 // ====== Beast Mode PvP ======
 function startPVP() {
   if (pvpActive) return;
