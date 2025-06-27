@@ -235,7 +235,7 @@ async function dropAll() {
 
 // ====== Auto Sleep ======
 bot.on('time', () => {
-  if (bot.time.isNight() && bedPosition) {
+  if ((bot.time.day >= 13000 && bot.time.day <= 23000) && bedPosition) {
     const bedBlock = bot.blockAt(bedPosition);
     if (bedBlock) {
       bot.sleep(bedBlock).then(() => {
