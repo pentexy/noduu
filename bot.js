@@ -1,5 +1,5 @@
 /**
- * Farm Bot with Terminal Command Input
+ * Farm Bot with Terminal & Chat Commands (Fixed)
  * Author: RareAura Automation Setup
  */
 
@@ -11,6 +11,7 @@ const bot = mineflayer.createBot({
   host: '54.169.77.84',
   port: 25565,
   username: 'FarmBot1',
+  version: '1.21' // replace with your exact server version if different
 });
 
 bot.loadPlugin(pathfinder);
@@ -34,18 +35,39 @@ bot.on('spawn', () => {
 
   bot.chat('Bot online. Going to farm coords...');
 
+  // Go directly to farm coords on spawn
   const farmGoal = new goals.GoalBlock(-422, 64, -1480);
   bot.pathfinder.setMovements(defaultMove);
   bot.pathfinder.setGoal(farmGoal);
 
   setInterval(() => {
-    if (bot.food < 15) eatFood();
+    if (bot.food < 15) {
+      const hasFood = bot.inventory.items().some(item =>
+        item.name.includes('bread') ||
+        item.name.includes('apple') ||
+        item.name.includes('cooked')
+      );
+      if (hasFood) eatFood();
+    }
   }, 5000);
+});
+
+// ====== Chat Command Handler ======
+bot.on('chat', async (username, message) => {
+  if (username.toLowerCase() !== 'rareaura') return;
+  if (!message.startsWith('!')) return;
+
+  handleCommand(message.trim().toLowerCase());
 });
 
 // ====== Terminal Command Handler ======
 function handleTerminalCommand(input) {
   const command = input.trim().toLowerCase();
+  handleCommand(command);
+}
+
+// ====== Unified Command Handler ======
+function handleCommand(command) {
   const mcData = require('minecraft-data')(bot.version);
   const defaultMove = new Movements(bot, mcData);
   defaultMove.allowSprinting = true;
@@ -53,14 +75,14 @@ function handleTerminalCommand(input) {
   defaultMove.liquidCost = 1;
 
   if (command === '!follow') {
-    const target = bot.players['RareAura']?.entity;
+    const target = bot.players['RAREAURA']?.entity;
     if (!target) {
-      console.log("Can't see RareAura!");
-      bot.chat("Can't see RareAura!");
+      console.log("Can't see RAREAURA!");
+      bot.chat("Can't see RAREAURA!");
       return;
     }
-    console.log('Following RareAura...');
-    bot.chat('Following RareAura...');
+    console.log('Following RAREAURA...');
+    bot.chat('Following you...');
     bot.pathfinder.setMovements(defaultMove);
     const goal = new goals.GoalFollow(target, 1);
     bot.pathfinder.setGoal(goal, true);
@@ -98,7 +120,7 @@ function handleTerminalCommand(input) {
   }
 
   else {
-    console.log('Unknown command.');
+    console.log('Unknown command:', command);
   }
 }
 
@@ -134,6 +156,13 @@ function eatFood() {
   }
 }
 
-// ====== Bot Events ======
-bot.on('error', err => console.log('Bot Error:', err));
+// ====== Error Handling ======
+bot.on('error', err => {
+  if (err.name === 'PartialReadError') {
+    console.log('Ignored PartialReadError:', err.message);
+  } else {
+    console.log('Bot Error:', err);
+  }
+});
+
 bot.on('kicked', reason => console.log('Bot Kicked:', reason));
