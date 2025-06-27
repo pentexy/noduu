@@ -7,17 +7,16 @@
 const mineflayer = require('mineflayer');
 const { pathfinder, Movements, goals } = require('mineflayer-pathfinder');
 const collectBlock = require('mineflayer-collectblock').plugin;
-const mineflayerCraft = require('mineflayer-craft').plugin;
+const Vec3 = require('vec3');
 
 const bot = mineflayer.createBot({
   host: '54.169.77.84',
   port: 25565,
-  username: 'XPFARMbotOP', // Replace with bot username
+  username: 'FarmBot1', // Replace with bot username
 });
 
 bot.loadPlugin(pathfinder);
 bot.loadPlugin(collectBlock);
-bot.loadPlugin(mineflayerCraft);
 
 // ====== Bot Spawn ======
 bot.on('spawn', async () => {
@@ -48,6 +47,9 @@ bot.on('chat', async (username, message) => {
 
   const mcData = require('minecraft-data')(bot.version);
   const defaultMove = new Movements(bot, mcData);
+  defaultMove.allowSprinting = true;
+  defaultMove.canSwim = true;
+  defaultMove.liquidCost = 1;
 
   if (message === 'follow') {
     const target = bot.players['RareAura']?.entity;
@@ -104,6 +106,9 @@ function eatFood() {
 // ====== Collect Wood & Craft Boat ======
 async function collectWoodAndCraftBoat(defaultMove) {
   try {
+    const mcData = require('minecraft-data')(bot.version);
+
+    // Find and collect log block
     const logBlock = bot.findBlock({
       matching: block => block.name.includes('log'),
       maxDistance: 32
@@ -117,28 +122,39 @@ async function collectWoodAndCraftBoat(defaultMove) {
     bot.chat('Collecting wood...');
     await bot.collectBlock.collect(logBlock);
 
-    // Craft crafting table
-    const mcData = require('minecraft-data')(bot.version);
+    // Craft planks from logs
     const plankRecipe = bot.recipesFor(mcData.itemsByName.oak_planks.id, null, 1)[0];
-    await bot.craft(plankRecipe, 1, null);
+    if (plankRecipe) {
+      await bot.craft(plankRecipe, 1, null);
+      bot.chat('Crafted planks.');
+    }
 
+    // Craft crafting table
     const craftingTableRecipe = bot.recipesFor(mcData.itemsByName.crafting_table.id, null, 1)[0];
-    await bot.craft(craftingTableRecipe, 1, null);
-    bot.chat('Crafted crafting table.');
+    if (craftingTableRecipe) {
+      await bot.craft(craftingTableRecipe, 1, null);
+      bot.chat('Crafted crafting table.');
+    }
 
     // Place crafting table
-    const targetPos = bot.entity.position.offset(1, -1, 0);
     const craftingTableItem = bot.inventory.items().find(i => i.name.includes('crafting_table'));
-    await bot.equip(craftingTableItem, 'hand');
-    await bot.placeBlock(bot.blockAt(targetPos), new Vec3(1, 0, 0));
-    bot.chat('Placed crafting table.');
+    if (craftingTableItem) {
+      const targetPos = bot.entity.position.offset(1, -1, 0);
+      await bot.equip(craftingTableItem, 'hand');
+      await bot.placeBlock(bot.blockAt(targetPos), new Vec3(1, 0, 0));
+      bot.chat('Placed crafting table.');
+    }
 
-    // Craft boat
+    // Craft boat using placed crafting table
     const boatRecipe = bot.recipesFor(mcData.itemsByName.oak_boat.id, null, 1)[0];
-    await bot.craft(boatRecipe, 1, bot.blockAt(targetPos));
-    bot.chat('Crafted boat.');
-
-    // Equip and use boat later if needed
+    if (boatRecipe) {
+      const craftingTableBlock = bot.findBlock({
+        matching: mcData.blocksByName.crafting_table.id,
+        maxDistance: 5
+      });
+      await bot.craft(boatRecipe, 1, craftingTableBlock);
+      bot.chat('Crafted boat.');
+    }
   } catch (err) {
     bot.chat('Error crafting boat: ' + err.message);
   }
