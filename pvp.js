@@ -1,5 +1,5 @@
 /**
- * RareAura PvP + Mob Beast Bot - No Escape Axe Killer AI
+ * RareAura Beast PvP + Mob Killer Bot - No Escape Mode
  * Author: RareAura
  */
 
@@ -63,22 +63,25 @@ bot.on('chat', async (username, message) => {
   }
 });
 
-// ====== When Bot is Hurt by Player or Mob ======
-bot.on('entitySwingArm', (entity) => {
-  if (!entity || entity.id === bot.entity.id) return;
+// ====== When Bot is Hurt (Players & Mobs) ======
+bot.on('entityHurt', (entity) => {
+  // Check if the bot itself was hurt by an attacker
+  if (!entity || entity.id !== bot.entity.id) return;
 
-  const attacker = bot.entities[entity.id];
-  if (!attacker) return;
+  const attackers = Object.values(bot.entities).filter(e =>
+    e.type === 'player' || e.type === 'mob'
+  ).filter(e =>
+    e.position.distanceTo(bot.entity.position) < 4
+  );
 
-  const dist = bot.entity.position.distanceTo(attacker.position);
-  if (dist < 4 && !target) {
-    target = attacker;
-    bot.chat(`🔥 New No-Escape Target: ${entity.username || entity.name}`);
+  if (attackers.length > 0 && !target) {
+    target = attackers[0];
+    bot.chat(`🔥 New Target Acquired: ${target.username || target.name}`);
     engageBeastMode();
   }
 });
 
-// ====== Engage Beast PvP Mode ======
+// ====== Engage Beast Mode PvP ======
 async function engageBeastMode() {
   if (!target) return;
 
@@ -96,7 +99,7 @@ async function engageBeastMode() {
       return;
     }
 
-    // Relentless follow – NO ESCAPE
+    // Follow target forever – NO ESCAPE
     bot.pathfinder.setMovements(defaultMove);
     bot.pathfinder.setGoal(new goals.GoalFollow(target, 0.5), true);
 
