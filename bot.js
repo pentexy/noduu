@@ -269,34 +269,6 @@ async function dropAll() {
   }
 }
 
-
-
-    // 4. Put bread in nearest chest
-    const chestBlock = bot.findBlock({
-      matching: block => block.name.includes('chest'),
-      maxDistance: 6
-    });
-
-    if (chestBlock) {
-      const chest = await bot.openChest(chestBlock);
-      const bread = bot.inventory.items().find(i => i.name === 'bread');
-      if (bread) {
-        await chest.deposit(bread.type, null, bread.count);
-        bot.chat(`📦 Stored ${bread.count} bread.`);
-      }
-      chest.close();
-    }
-
-  }, 8000); // runs every 8s
-}
-
-function stopFarming() {
-  if (!farmingActive) return;
-  farmingActive = false;
-  clearInterval(farmingInterval);
-  bot.chat('❌ Farming mode disabled.');
-}
-
 // ====== Auto Sleep ======
 bot.on('time', () => {
   if ((bot.time.day >= 13000 && bot.time.day <= 23000) && bedPosition) {
