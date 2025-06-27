@@ -1,5 +1,5 @@
 /**
- * Final FarmBot: Home/Tower Save, Oxygen AI, Sleep, GearUp, DropAll
+ * Final FarmBot: Home/Tower Save, Oxygen AI, Sleep, GearUp, DropAll, Beast PVP
  * Author: RareAura Automation Setup
  */
 
@@ -8,7 +8,7 @@ const { pathfinder, Movements, goals } = require('mineflayer-pathfinder');
 const readline = require('readline');
 
 let bedPosition = null;
-let homePosition = null;
+let homePosition = { x: -419, y: 67, z: -1448 }; // Default home
 let towerPosition = null;
 
 const bot = mineflayer.createBot({
@@ -62,7 +62,7 @@ bot.on('spawn', () => {
 // ====== Chat Command Handler ======
 bot.on('chat', async (username, message) => {
   if (username.toLowerCase() !== 'rareaura') return;
-  if (!message.startsWith('!')) return;
+  if (!message.startsWith('!') && !message.startsWith('/')) return;
 
   handleCommand(message.trim().toLowerCase());
 });
@@ -122,7 +122,7 @@ async function handleCommand(command) {
     bot.chat(`Tower position set at X:${towerPosition.x} Y:${towerPosition.y} Z:${towerPosition.z}`);
   }
 
-  else if (command === '!goto') {
+  else if (command === '!goto' || command === '/cumbase') {
     if (!homePosition) {
       bot.chat('No home set yet. Use !sethome first.');
       return;
@@ -152,6 +152,11 @@ async function handleCommand(command) {
 
   else if (command === '!alive') {
     bot.chat('I am alive.');
+  }
+
+  else if (command === '!pvp') {
+    bot.chat('Beast Mode PVP enabled with simulated 100 CPS!');
+    startPVP();
   }
 
   else {
@@ -246,6 +251,18 @@ bot.on('time', () => {
     }
   }
 });
+
+// ====== Beast Mode PVP ======
+function startPVP() {
+  setInterval(() => {
+    const targets = bot.nearestEntity(entity =>
+      entity.type === 'mob' || entity.type === 'player'
+    );
+    if (targets) {
+      bot.attack(targets);
+    }
+  }, 10); // 100 CPS simulated (every 10ms)
+}
 
 // ====== Error Handling ======
 bot.on('error', err => {
