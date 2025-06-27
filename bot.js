@@ -1,24 +1,20 @@
 /**
- * Farm Bot with Wood Collection, Boat Crafting & Swimming
- * Server: 54.169.77.84:25565
- * Author: RareAura Automation Setup
+ * Farm Bot with Vanilla Wood Collection, Crafting Table & Boat Crafting
+ * No external collectblock plugin needed
  */
 
 const mineflayer = require('mineflayer');
 const { pathfinder, Movements, goals } = require('mineflayer-pathfinder');
-const collectBlock = require('mineflayer-collectblock').plugin;
 const Vec3 = require('vec3');
 
 const bot = mineflayer.createBot({
   host: '54.169.77.84',
   port: 25565,
-  username: 'FarmBot1', // Replace with bot username
+  username: 'FarmBot1',
 });
 
 bot.loadPlugin(pathfinder);
-bot.loadPlugin(collectBlock);
 
-// ====== Bot Spawn ======
 bot.on('spawn', async () => {
   const mcData = require('minecraft-data')(bot.version);
   const defaultMove = new Movements(bot, mcData);
@@ -27,11 +23,10 @@ bot.on('spawn', async () => {
   defaultMove.canSwim = true;
   defaultMove.liquidCost = 1;
 
-  bot.chat('Bot online. Starting wood collection...');
+  bot.chat('Bot online. Collecting wood...');
+  await collectWood(defaultMove);
 
-  await collectWoodAndCraftBoat(defaultMove);
-
-  // ====== Move to farm after crafting ======
+  // Move to farm coords
   const farmGoal = new goals.GoalBlock(-422, 64, -1480);
   bot.pathfinder.setMovements(defaultMove);
   bot.pathfinder.setGoal(farmGoal);
@@ -103,12 +98,12 @@ function eatFood() {
   }
 }
 
-// ====== Collect Wood & Craft Boat ======
-async function collectWoodAndCraftBoat(defaultMove) {
+// ====== Collect Wood (Vanilla) ======
+async function collectWood(defaultMove) {
   try {
     const mcData = require('minecraft-data')(bot.version);
 
-    // Find and collect log block
+    // Find nearest log
     const logBlock = bot.findBlock({
       matching: block => block.name.includes('log'),
       maxDistance: 32
@@ -119,10 +114,16 @@ async function collectWoodAndCraftBoat(defaultMove) {
       return;
     }
 
-    bot.chat('Collecting wood...');
-    await bot.collectBlock.collect(logBlock);
+    // Move to log
+    bot.pathfinder.setMovements(defaultMove);
+    const goal = new goals.GoalBlock(logBlock.position.x, logBlock.position.y, logBlock.position.z);
+    await bot.pathfinder.goto(goal);
 
-    // Craft planks from logs
+    // Dig log
+    await bot.dig(logBlock);
+    bot.chat('Collected wood.');
+
+    // Craft planks
     const plankRecipe = bot.recipesFor(mcData.itemsByName.oak_planks.id, null, 1)[0];
     if (plankRecipe) {
       await bot.craft(plankRecipe, 1, null);
@@ -155,8 +156,9 @@ async function collectWoodAndCraftBoat(defaultMove) {
       await bot.craft(boatRecipe, 1, craftingTableBlock);
       bot.chat('Crafted boat.');
     }
+
   } catch (err) {
-    bot.chat('Error crafting boat: ' + err.message);
+    bot.chat('Error collecting wood or crafting: ' + err.message);
   }
 }
 
