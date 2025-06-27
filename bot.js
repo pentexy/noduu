@@ -1,6 +1,5 @@
 /**
- * Farm Bot with GearUp, DropAll, Respawn Memory & Environment Sense
- * Compatible with Minecraft 1.21
+ * Final FarmBot: Home/Tower Save, Oxygen AI, Sleep, GearUp, DropAll
  * Author: RareAura Automation Setup
  */
 
@@ -9,12 +8,14 @@ const { pathfinder, Movements, goals } = require('mineflayer-pathfinder');
 const readline = require('readline');
 
 let bedPosition = null;
+let homePosition = null;
+let towerPosition = null;
 
 const bot = mineflayer.createBot({
   host: '54.169.77.84',
   port: 25565,
   username: 'FarmBot1',
-  version: '1.21' // replace if needed
+  version: '1.21'
 });
 
 bot.loadPlugin(pathfinder);
@@ -34,14 +35,19 @@ bot.on('spawn', () => {
   defaultMove.allowSprinting = true;
   defaultMove.canSwim = true;
   defaultMove.liquidCost = 1;
-  defaultMove.canDig = false; // no griefing
+  defaultMove.canDig = false;
 
-  bot.chat('Bot online. Going to farm coords...');
-  const farmGoal = new goals.GoalBlock(-422, 64, -1480);
-  bot.pathfinder.setMovements(defaultMove);
-  bot.pathfinder.setGoal(farmGoal);
+  bot.chat('Bot online. Ready for commands.');
 
   setInterval(async () => {
+    // Oxygen AI
+    if (bot.entity.isInWater && bot.oxygenLevel < 6) {
+      const pos = bot.entity.position.offset(1, 0, 0);
+      bot.pathfinder.setGoal(new goals.GoalBlock(pos.x, pos.y, pos.z), true);
+      bot.chat('Low oxygen! Moving sideways to breathe.');
+    }
+
+    // Auto Eat
     if (bot.food < 15) {
       const hasFood = bot.inventory.items().some(item =>
         item.name.includes('bread') ||
@@ -61,7 +67,7 @@ bot.on('chat', async (username, message) => {
   handleCommand(message.trim().toLowerCase());
 });
 
-// ====== Unified Command Handler ======
+// ====== Command Handler ======
 async function handleCommand(command) {
   const mcData = require('minecraft-data')(bot.version);
   const defaultMove = new Movements(bot, mcData);
@@ -78,8 +84,7 @@ async function handleCommand(command) {
     }
     bot.chat('Following you...');
     bot.pathfinder.setMovements(defaultMove);
-    const goal = new goals.GoalFollow(target, 1);
-    bot.pathfinder.setGoal(goal, true);
+    bot.pathfinder.setGoal(new goals.GoalFollow(target, 1), true);
   }
 
   else if (command === '!stop') {
@@ -96,17 +101,45 @@ async function handleCommand(command) {
     bot.chat(`I am at X:${pos.x.toFixed(1)} Y:${pos.y.toFixed(1)} Z:${pos.z.toFixed(1)}`);
   }
 
-  else if (command === '!goto') {
-    bot.chat('Going to farm coords...');
-    const farmGoal = new goals.GoalBlock(-422, 64, -1480);
-    bot.pathfinder.setMovements(defaultMove);
-    bot.pathfinder.setGoal(farmGoal);
+  else if (command === '!sethome') {
+    const pos = bot.entity.position;
+    homePosition = { x: Math.floor(pos.x), y: Math.floor(pos.y), z: Math.floor(pos.z) };
+    const bed = bot.findBlock({
+      matching: block => bot.isABed(block),
+      maxDistance: 5
+    });
+    if (bed) {
+      bedPosition = bed.position;
+      bot.chat(`Home set at X:${homePosition.x} Y:${homePosition.y} Z:${homePosition.z} with bed saved.`);
+    } else {
+      bot.chat(`Home set at X:${homePosition.x} Y:${homePosition.y} Z:${homePosition.z} but no bed found nearby.`);
+    }
   }
 
-  else if (command === '!setrespawn') {
+  else if (command === '!settower') {
     const pos = bot.entity.position;
-    bedPosition = { x: Math.floor(pos.x), y: Math.floor(pos.y), z: Math.floor(pos.z) };
-    bot.chat(`Respawn bed position set at X:${bedPosition.x} Y:${bedPosition.y} Z:${bedPosition.z}`);
+    towerPosition = { x: Math.floor(pos.x), y: Math.floor(pos.y), z: Math.floor(pos.z) };
+    bot.chat(`Tower position set at X:${towerPosition.x} Y:${towerPosition.y} Z:${towerPosition.z}`);
+  }
+
+  else if (command === '!goto') {
+    if (!homePosition) {
+      bot.chat('No home set yet. Use !sethome first.');
+      return;
+    }
+    bot.chat('Going to home...');
+    bot.pathfinder.setMovements(defaultMove);
+    bot.pathfinder.setGoal(new goals.GoalBlock(homePosition.x, homePosition.y, homePosition.z));
+  }
+
+  else if (command === '!gotower') {
+    if (!towerPosition) {
+      bot.chat('No tower set yet. Use !settower first.');
+      return;
+    }
+    bot.chat('Going to tower...');
+    bot.pathfinder.setMovements(defaultMove);
+    bot.pathfinder.setGoal(new goals.GoalBlock(towerPosition.x, towerPosition.y, towerPosition.z));
   }
 
   else if (command === '!gearup') {
@@ -152,7 +185,7 @@ async function eatFood() {
   }
 }
 
-// ====== Gear Up (equip all armor and tools) ======
+// ====== Gear Up ======
 async function gearUp() {
   const armorSlots = ['head', 'torso', 'legs', 'feet'];
   const armorTypes = ['helmet', 'chestplate', 'leggings', 'boots'];
@@ -182,7 +215,7 @@ async function gearUp() {
   }
 }
 
-// ====== Drop All Items to RAREAURA ======
+// ====== Drop All Items ======
 async function dropAll() {
   const targetPlayer = bot.players['RAREAURA']?.entity;
   if (!targetPlayer) {
@@ -200,25 +233,17 @@ async function dropAll() {
   }
 }
 
-// ====== Auto Sleep when RAREAURA sleeps ======
-bot.on('playerSleep', async (player) => {
-  if (player.username.toLowerCase() !== 'rareaura') return;
-  if (!bedPosition) {
-    bot.chat('No bed position set. Use !setrespawn first.');
-    return;
-  }
-
-  const bedBlock = bot.blockAt(bedPosition);
-  if (!bedBlock) {
-    bot.chat('Bed not found at saved position.');
-    return;
-  }
-
-  try {
-    await bot.sleep(bedBlock);
-    bot.chat('Sleeping...');
-  } catch (err) {
-    bot.chat("Couldn't sleep: " + err.message);
+// ====== Auto Sleep ======
+bot.on('time', () => {
+  if (bot.time.isNight() && bedPosition) {
+    const bedBlock = bot.blockAt(bedPosition);
+    if (bedBlock) {
+      bot.sleep(bedBlock).then(() => {
+        bot.chat('Sleeping...');
+      }).catch(err => {
+        bot.chat("Couldn't sleep: " + err.message);
+      });
+    }
   }
 });
 
@@ -228,5 +253,4 @@ bot.on('error', err => {
     console.log('Bot Error:', err);
   }
 });
-
 bot.on('kicked', reason => console.log('Bot Kicked:', reason));
