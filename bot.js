@@ -1,5 +1,5 @@
 /**
- * Farm Bot with Direct Go-To Command
+ * Farm Bot with Auto-Go, Prefix Commands, and Alive Check
  * Author: RareAura Automation Setup
  */
 
@@ -23,7 +23,12 @@ bot.on('spawn', () => {
   defaultMove.canSwim = true;
   defaultMove.liquidCost = 1;
 
-  bot.chat('Bot online. Ready for commands.');
+  bot.chat('Bot online. Going to farm coords...');
+
+  // Go directly to farm coords on spawn
+  const farmGoal = new goals.GoalBlock(-422, 64, -1480);
+  bot.pathfinder.setMovements(defaultMove);
+  bot.pathfinder.setGoal(farmGoal);
 
   setInterval(() => {
     if (bot.food < 15) eatFood();
@@ -33,6 +38,9 @@ bot.on('spawn', () => {
 // ====== Chat Commands ======
 bot.on('chat', async (username, message) => {
   if (username !== 'RareAura') return;
+  if (!message.startsWith('!')) return;
+
+  const command = message.slice(1).trim().toLowerCase();
 
   const mcData = require('minecraft-data')(bot.version);
   const defaultMove = new Movements(bot, mcData);
@@ -40,7 +48,7 @@ bot.on('chat', async (username, message) => {
   defaultMove.canSwim = true;
   defaultMove.liquidCost = 1;
 
-  if (message === 'follow') {
+  if (command === 'follow') {
     const target = bot.players['RareAura']?.entity;
     if (!target) {
       bot.chat("Can't see you, RareAura!");
@@ -52,25 +60,29 @@ bot.on('chat', async (username, message) => {
     bot.pathfinder.setGoal(goal, true);
   }
 
-  if (message === 'stop') {
+  if (command === 'stop') {
     bot.chat('Stopping here.');
     bot.pathfinder.setGoal(null);
   }
 
-  if (message === 'eat') {
+  if (command === 'eat') {
     eatFood();
   }
 
-  if (message === 'tcords') {
+  if (command === 'tcords') {
     const pos = bot.entity.position;
     bot.chat(`I am at X:${pos.x.toFixed(1)} Y:${pos.y.toFixed(1)} Z:${pos.z.toFixed(1)}`);
   }
 
-  if (message === 'goto') {
+  if (command === 'goto') {
     bot.chat('Going to farm coordinates...');
     const farmGoal = new goals.GoalBlock(-422, 64, -1480);
     bot.pathfinder.setMovements(defaultMove);
     bot.pathfinder.setGoal(farmGoal);
+  }
+
+  if (command === 'alive') {
+    bot.chat('I am alive.');
   }
 });
 
