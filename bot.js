@@ -105,6 +105,12 @@ async function handleCommand(command) {
     const pos = bot.entity.position;
     bot.chat(`I am at X:${pos.x.toFixed(1)} Y:${pos.y.toFixed(1)} Z:${pos.z.toFixed(1)}`);
   }
+    else if (command === '!farmer on') {
+  startFarming();
+}
+    else if (command === '!farmer off') {
+  stopFarming();
+}
 
   else if (command === '!sethome') {
     const pos = bot.entity.position;
@@ -306,8 +312,26 @@ bot.on('time', () => {
 });
 
 // ====== Farming Module ======
+// ====== Farming Module ======
 let farmingActive = false;
 let farmingInterval = null;
+
+function startFarming() {
+  if (farmingActive) return;
+  farmingActive = true;
+  bot.chat('🌾 Farming mode enabled.');
+
+  farmingInterval = setInterval(() => {
+    if (farmingActive) farmingTask();
+  }, 10000);
+}
+
+function stopFarming() {
+  if (!farmingActive) return;
+  clearInterval(farmingInterval);
+  farmingActive = false;
+  bot.chat('❌ Farming mode disabled.');
+}
 
 async function farmingTask() {
   try {
@@ -378,41 +402,6 @@ async function farmingTask() {
   } catch (err) {
     bot.chat('❌ Farming error: ' + err.message);
   }
-}
-
-function startFarming() {
-  if (farmingActive) return;
-  farmingActive = true;
-  bot.chat('🌾 Farming mode enabled.');
-  farmingInterval = setInterval(() => {
-    if (farmingActive) farmingTask();
-  }, 10000);
-}
-
-function stopFarming() {
-  if (!farmingActive) return;
-  clearInterval(farmingInterval);
-  farmingActive = false;
-  bot.chat('❌ Farming mode disabled.');
-}
-
-// ====== Farming Command Handler Integration ======
-
-async function handleCommand(command) {
-  const mcData = require('minecraft-data')(bot.version);
-  const defaultMove = new Movements(bot, mcData);
-  defaultMove.allowSprinting = true;
-  defaultMove.canSwim = true;
-  defaultMove.liquidCost = 1;
-  defaultMove.canDig = false;
-
-  if (command === '!farmer on') {
-    startFarming();
-  } else if (command === '!farmer off') {
-    stopFarming();
-  }
-
-  // Your other existing commands follow...
 }
 
 
