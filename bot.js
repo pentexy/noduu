@@ -1,5 +1,5 @@
 /**
- * Farm Bot with Terminal & Chat Commands (Fixed)
+ * Farm Bot with Terminal & Chat Commands (1.21 Compatible)
  * Author: RareAura Automation Setup
  */
 
@@ -11,7 +11,7 @@ const bot = mineflayer.createBot({
   host: '54.169.77.84',
   port: 25565,
   username: 'FarmBot1',
-  version: '1.21' // replace with your exact server version if different
+  version: '1.21' // Replace with your exact server version if different
 });
 
 bot.loadPlugin(pathfinder);
@@ -22,7 +22,7 @@ const rl = readline.createInterface({
   output: process.stdout
 });
 
-rl.on('line', handleTerminalCommand);
+rl.on('line', input => handleCommand(input.trim().toLowerCase()));
 
 // ====== Bot Ready ======
 bot.on('spawn', () => {
@@ -40,14 +40,14 @@ bot.on('spawn', () => {
   bot.pathfinder.setMovements(defaultMove);
   bot.pathfinder.setGoal(farmGoal);
 
-  setInterval(() => {
+  setInterval(async () => {
     if (bot.food < 15) {
       const hasFood = bot.inventory.items().some(item =>
         item.name.includes('bread') ||
         item.name.includes('apple') ||
         item.name.includes('cooked')
       );
-      if (hasFood) eatFood();
+      if (hasFood) await eatFood();
     }
   }, 5000);
 });
@@ -60,14 +60,8 @@ bot.on('chat', async (username, message) => {
   handleCommand(message.trim().toLowerCase());
 });
 
-// ====== Terminal Command Handler ======
-function handleTerminalCommand(input) {
-  const command = input.trim().toLowerCase();
-  handleCommand(command);
-}
-
 // ====== Unified Command Handler ======
-function handleCommand(command) {
+async function handleCommand(command) {
   const mcData = require('minecraft-data')(bot.version);
   const defaultMove = new Movements(bot, mcData);
   defaultMove.allowSprinting = true;
@@ -77,46 +71,45 @@ function handleCommand(command) {
   if (command === '!follow') {
     const target = bot.players['RAREAURA']?.entity;
     if (!target) {
-      console.log("Can't see RAREAURA!");
       bot.chat("Can't see RAREAURA!");
+      console.log("Can't see RAREAURA!");
       return;
     }
-    console.log('Following RAREAURA...');
     bot.chat('Following you...');
+    console.log('Following RAREAURA...');
     bot.pathfinder.setMovements(defaultMove);
     const goal = new goals.GoalFollow(target, 1);
     bot.pathfinder.setGoal(goal, true);
   }
 
   else if (command === '!stop') {
-    console.log('Stopping bot.');
     bot.chat('Stopping here.');
+    console.log('Stopping bot.');
     bot.pathfinder.setGoal(null);
   }
 
   else if (command === '!eat') {
-    console.log('Bot eating food if available.');
-    eatFood();
+    await eatFood();
   }
 
   else if (command === '!tcords') {
     const pos = bot.entity.position;
     const msg = `I am at X:${pos.x.toFixed(1)} Y:${pos.y.toFixed(1)} Z:${pos.z.toFixed(1)}`;
-    console.log(msg);
     bot.chat(msg);
+    console.log(msg);
   }
 
   else if (command === '!goto') {
-    console.log('Going to farm coords.');
     bot.chat('Going to farm coords...');
+    console.log('Going to farm coords.');
     const farmGoal = new goals.GoalBlock(-422, 64, -1480);
     bot.pathfinder.setMovements(defaultMove);
     bot.pathfinder.setGoal(farmGoal);
   }
 
   else if (command === '!alive') {
-    console.log('Bot is alive.');
     bot.chat('I am alive.');
+    console.log('Bot is alive.');
   }
 
   else {
@@ -124,8 +117,8 @@ function handleCommand(command) {
   }
 }
 
-// ====== Eat Food ======
-function eatFood() {
+// ====== Eat Food (Async/Await 1.21 Compatible) ======
+async function eatFood() {
   const foodItem = bot.inventory.items().find(item =>
     item.name.includes('bread') ||
     item.name.includes('apple') ||
@@ -133,23 +126,15 @@ function eatFood() {
   );
 
   if (foodItem) {
-    bot.equip(foodItem, 'hand', (err) => {
-      if (err) {
-        bot.chat("Couldn't equip food.");
-        console.log("Couldn't equip food.");
-        return;
-      }
-      bot.consume((err) => {
-        if (err) {
-          bot.chat("Couldn't eat food.");
-          console.log("Couldn't eat food.");
-        }
-        else {
-          bot.chat('Eating food.');
-          console.log('Eating food.');
-        }
-      });
-    });
+    try {
+      await bot.equip(foodItem, 'hand');
+      await bot.consumeFood(); // Updated for Mineflayer 1.21 compatibility
+      bot.chat(`Eating ${foodItem.name}`);
+      console.log(`Eating ${foodItem.name}`);
+    } catch (err) {
+      bot.chat("Couldn't eat food: " + err.message);
+      console.log("Couldn't eat food:", err);
+    }
   } else {
     bot.chat('No food found!');
     console.log('No food found!');
