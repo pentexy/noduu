@@ -1,5 +1,5 @@
 /**
- * RareAura Beast PvP + Mob Killer Bot - No Escape Mode
+ * RareAura Beast PvP + Mob Killer Bot - No Escape + Roasts
  * Author: RareAura
  */
 
@@ -44,7 +44,7 @@ setInterval(async () => {
         await bot.consume();
         bot.chat(`🍗 Auto ate ${food.name}`);
       } catch (err) {
-        bot.chat("Couldn't auto eat: " + err.message);
+        bot.chat("😵 Couldn't auto eat: " + err.message);
       }
     }
   }
@@ -58,24 +58,37 @@ bot.on('chat', async (username, message) => {
       await bot.equip(axe, 'hand');
       bot.chat(`🪓 Axe equipped: ${axe.name}`);
     } else {
-      bot.chat('No axe found in inventory.');
+      bot.chat('❌ No axe found in inventory.');
     }
   }
 });
 
 // ====== When Bot is Hurt (Players & Mobs) ======
 bot.on('entityHurt', (entity) => {
-  // Check if the bot itself was hurt by an attacker
+  // Check if bot itself was hurt
   if (!entity || entity.id !== bot.entity.id) return;
 
   const attackers = Object.values(bot.entities).filter(e =>
-    e.type === 'player' || e.type === 'mob'
-  ).filter(e =>
-    e.position.distanceTo(bot.entity.position) < 4
+    (e.type === 'player' || e.type === 'mob') &&
+    e.position.distanceTo(bot.entity.position) < 5
   );
 
   if (attackers.length > 0 && !target) {
     target = attackers[0];
+
+    // Roast if armor detected (players only)
+    if (target.type === 'player') {
+      const armor = target.equipment?.filter(it => it)?.map(it => it.name).join(', ');
+      if (armor) {
+        bot.chat(`😏 Huh? Wearing ${armor}? That won't save you from death!`);
+      } else {
+        bot.chat(`🤣 No armor? Free kill alert!`);
+      }
+    } else {
+      // Mobs roast line
+      bot.chat(`💀 A ${target.name} dares to touch me? Prepare to die.`);
+    }
+
     bot.chat(`🔥 New Target Acquired: ${target.username || target.name}`);
     engageBeastMode();
   }
@@ -102,6 +115,17 @@ async function engageBeastMode() {
     // Follow target forever – NO ESCAPE
     bot.pathfinder.setMovements(defaultMove);
     bot.pathfinder.setGoal(new goals.GoalFollow(target, 0.5), true);
+
+    // Random roasts while chasing
+    if (Math.random() < 0.05) {
+      const roasts = [
+        "🏃‍♂️ Run faster, you're still gonna die!",
+        "😈 Can't hide from RareAura Beast!",
+        "🤣 Is that all you got?",
+        "💀 Weakling detected."
+      ];
+      bot.chat(roasts[Math.floor(Math.random() * roasts.length)]);
+    }
 
     // Critical jump hits
     if (bot.entity.onGround) {
