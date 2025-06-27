@@ -91,13 +91,6 @@ async function handleCommand(command) {
     bot.pathfinder.setMovements(defaultMove);
     bot.pathfinder.setGoal(new goals.GoalFollow(target, 1), true);
   }
-    else if (command === '!farmer on') {
-  startFarming();
-  }
-
-    else if (command === '!farmer off') {
-  stopFarming();
-  }
 
   else if (command === '!stop') {
     bot.chat('Stopping here.');
@@ -316,92 +309,110 @@ bot.on('time', () => {
 let farmingActive = false;
 let farmingInterval = null;
 
-async function startFarming() {
+async function farmingTask() {
+  try {
+    const mcData = require('minecraft-data')(bot.version);
+    const Vec3 = require('vec3');
+
+    const wheatID = mcData.blocksByName.wheat.id;
+    const seedID = mcData.itemsByName.wheat_seeds.id;
+    const craftingTableID = mcData.blocksByName.crafting_table.id;
+    const breadRecipe = bot.recipesFor(mcData.itemsByName.bread.id, null, 1, null)[0];
+
+    // 1. Find grown wheat
+    const wheat = bot.findBlock({
+      matching: b => b.type === wheatID && b.metadata === 7,
+      maxDistance: 6
+    });
+
+    if (wheat) {
+      await bot.pathfinder.goto(new goals.GoalBlock(wheat.position.x, wheat.position.y, wheat.position.z));
+      await bot.dig(wheat);
+      bot.chat('🌾 Harvested wheat.');
+    }
+
+    // 2. Replant seeds
+    const farmland = bot.findBlock({
+      matching: block => {
+        const above = bot.blockAt(block.position.offset(0, 1, 0));
+        return block.name === 'farmland' && above && above.name === 'air';
+      },
+      maxDistance: 6
+    });
+
+    if (farmland) {
+      const seeds = bot.inventory.items().find(i => i.type === seedID);
+      if (seeds) {
+        await bot.equip(seeds, 'hand');
+        await bot.placeBlock(farmland, new Vec3(0, 1, 0));
+        bot.chat('🌱 Planted seed.');
+      }
+    }
+
+    // 3. Craft bread if wheat ≥ 3
+    const wheatItem = bot.inventory.items().find(i => i.name === 'wheat');
+    const table = bot.findBlock({ matching: craftingTableID, maxDistance: 6 });
+
+    if (wheatItem && wheatItem.count >= 3 && breadRecipe && table) {
+      await bot.pathfinder.goto(new goals.GoalBlock(table.position.x, table.position.y, table.position.z));
+      await bot.craft(breadRecipe, Math.floor(wheatItem.count / 3), table);
+      bot.chat('🍞 Crafted bread.');
+    }
+
+    // 4. Deposit bread in chest
+    const chestBlock = bot.findBlock({
+      matching: block => block.name.includes('chest'),
+      maxDistance: 6
+    });
+
+    if (chestBlock) {
+      const chest = await bot.openChest(chestBlock);
+      const breadItem = bot.inventory.items().find(i => i.name === 'bread');
+      if (breadItem) {
+        await chest.deposit(breadItem.type, null, breadItem.count);
+        bot.chat('📦 Stored bread in chest.');
+      }
+      chest.close();
+    }
+
+  } catch (err) {
+    bot.chat('❌ Farming error: ' + err.message);
+  }
+}
+
+function startFarming() {
   if (farmingActive) return;
   farmingActive = true;
   bot.chat('🌾 Farming mode enabled.');
-
-  const mcData = require('minecraft-data')(bot.version);
-  const Vec3 = require('vec3');
-
-  const wheatID = mcData.blocksByName.wheat.id;
-  const seedID = mcData.itemsByName.wheat_seeds.id;
-  const craftingTableID = mcData.blocksByName.crafting_table.id;
-  const breadRecipe = bot.recipesFor(mcData.itemsByName.bread.id, null, 1, null)[0];
-
-  farmingInterval = setInterval(async () => {
-    if (!farmingActive) return;
-
-    try {
-      // 1. Find grown wheat
-      const wheat = bot.findBlock({
-        matching: b => b.type === wheatID && b.metadata === 7,
-        maxDistance: 6
-      });
-
-      if (wheat) {
-        await bot.pathfinder.goto(new goals.GoalBlock(wheat.position.x, wheat.position.y, wheat.position.z));
-        await bot.dig(wheat);
-        bot.chat('🌾 Harvested wheat.');
-      }
-
-      // 2. Replant seeds
-      const farmland = bot.findBlock({
-        matching: block => {
-          const above = bot.blockAt(block.position.offset(0, 1, 0));
-          return block.name === 'farmland' && above && above.name === 'air';
-        },
-        maxDistance: 6
-      });
-
-      if (farmland) {
-        const seeds = bot.inventory.items().find(i => i.type === seedID);
-        if (seeds) {
-          await bot.equip(seeds, 'hand');
-          await bot.placeBlock(farmland, new Vec3(0, 1, 0));
-          bot.chat('🌱 Planted seed.');
-        }
-      }
-
-      // 3. Craft bread if wheat ≥ 3
-      const wheatItem = bot.inventory.items().find(i => i.name === 'wheat');
-      const table = bot.findBlock({ matching: craftingTableID, maxDistance: 6 });
-
-      if (wheatItem && wheatItem.count >= 3 && breadRecipe && table) {
-        await bot.pathfinder.goto(new goals.GoalBlock(table.position.x, table.position.y, table.position.z));
-        await bot.craft(breadRecipe, Math.floor(wheatItem.count / 3), table);
-        bot.chat('🍞 Crafted bread.');
-      }
-
-      // 4. Deposit bread in chest
-      const chestBlock = bot.findBlock({
-        matching: block => block.name.includes('chest'),
-        maxDistance: 6
-      });
-
-      if (chestBlock) {
-        const breadItem = bot.inventory.items().find(i => i.name === 'bread');
-        if (breadItem) {
-          await bot.pathfinder.goto(new goals.GoalBlock(chestBlock.position.x, chestBlock.position.y, chestBlock.position.z));
-          const chest = await bot.openChest(chestBlock);
-          await chest.deposit(breadItem.type, null, breadItem.count);
-          await chest.close();
-          bot.chat('📦 Deposited bread into chest.');
-        }
-      }
-
-    } catch (err) {
-      bot.chat('❌ Farming error: ' + err.message);
-    }
-
-  }, 10000); // every 10 seconds
+  farmingInterval = setInterval(() => {
+    if (farmingActive) farmingTask();
+  }, 10000);
 }
 
 function stopFarming() {
   if (!farmingActive) return;
-  farmingActive = false;
   clearInterval(farmingInterval);
-  bot.chat('🚫 Farming mode disabled.');
+  farmingActive = false;
+  bot.chat('❌ Farming mode disabled.');
+}
+
+// ====== Farming Command Handler Integration ======
+
+async function handleCommand(command) {
+  const mcData = require('minecraft-data')(bot.version);
+  const defaultMove = new Movements(bot, mcData);
+  defaultMove.allowSprinting = true;
+  defaultMove.canSwim = true;
+  defaultMove.liquidCost = 1;
+  defaultMove.canDig = false;
+
+  if (command === '!farmer on') {
+    startFarming();
+  } else if (command === '!farmer off') {
+    stopFarming();
+  }
+
+  // Your other existing commands follow...
 }
 
 
