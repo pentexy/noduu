@@ -1,5 +1,5 @@
 /**
- * RareAura PvP Bot - Axe Killer AI with AutoEat & MLG Clutch
+ * RareAura PvP Bot - Axe Killer AI with AutoEat, Critical Hits, MLG Clutch
  * Author: RareAura
  */
 
@@ -64,11 +64,15 @@ bot.on('chat', async (username, message) => {
 });
 
 // ====== When Bot is Hurt by Player ======
-bot.on('entityHurt', (entity) => {
-  if (!entity || !entity.username || entity.username === bot.username) return;
-  if (!target) {
-    const attacker = bot.players[entity.username]?.entity;
-    if (attacker) {
+bot.on('entitySwingArm', (entity) => {
+  if (entity.type !== 'player' || entity.username === bot.username) return;
+
+  const attacker = bot.players[entity.username]?.entity;
+  if (!attacker) return;
+
+  const distance = bot.entity.position.distanceTo(attacker.position);
+  if (distance < 4) { // attack range
+    if (!target) {
       target = attacker;
       bot.chat(`🔥 New PvP target: ${entity.username}`);
       engagePvP();
@@ -77,10 +81,14 @@ bot.on('entityHurt', (entity) => {
 });
 
 // ====== Engage PvP ======
-function engagePvP() {
+async function engagePvP() {
   if (!target) return;
 
-  pvpInterval = setInterval(async () => {
+  const axe = bot.inventory.items().find(i => i.name.includes('axe'));
+  if (axe) await bot.equip(axe, 'hand');
+  else bot.chat('⚠️ No axe equipped, attacking barehanded.');
+
+  pvpInterval = setInterval(() => {
     if (!target || !target.isValid) {
       clearInterval(pvpInterval);
       target = null;
@@ -102,10 +110,10 @@ function engagePvP() {
     bot.pathfinder.setMovements(defaultMove);
     bot.pathfinder.setGoal(new goals.GoalFollow(target, 1), true);
 
-    // Jump for critical hit if on ground
+    // Critical hit jump if on ground
     if (bot.entity.onGround) {
       bot.setControlState('jump', true);
-      setTimeout(() => bot.setControlState('jump', false), 200);
+      setTimeout(() => bot.setControlState('jump', false), 150);
     }
 
     // Attack with simulated 100 CPS
@@ -113,7 +121,7 @@ function engagePvP() {
       bot.attack(target);
     }
 
-  }, 10); // 100 CPS (10ms interval)
+  }, 10); // every 10ms for 100 CPS
 }
 
 // ====== MLG Clutch ======
