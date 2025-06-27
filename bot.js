@@ -1,5 +1,5 @@
 /**
- * Final FarmBot: Home/Tower Save, Oxygen AI, Sleep, GearUp, DropAll, Beast PVP
+ * Final FarmBot: Home/Tower Save, Oxygen AI, Sleep, GearUp, DropAll, Realistic PvP
  * Author: RareAura Automation Setup
  */
 
@@ -10,6 +10,8 @@ const readline = require('readline');
 let bedPosition = null;
 let homePosition = { x: -419, y: 67, z: -1448 }; // Default home
 let towerPosition = null;
+let pvpActive = false;
+let pvpInterval = null;
 
 const bot = mineflayer.createBot({
   host: '54.169.77.84',
@@ -52,6 +54,8 @@ bot.on('spawn', () => {
       const hasFood = bot.inventory.items().some(item =>
         item.name.includes('bread') ||
         item.name.includes('apple') ||
+        item.name.includes('melon') ||
+        item.name.includes('salmon') ||
         item.name.includes('cooked')
       );
       if (hasFood) await eatFood();
@@ -123,10 +127,6 @@ async function handleCommand(command) {
   }
 
   else if (command === '!goto' || command === '/cumbase') {
-    if (!homePosition) {
-      bot.chat('No home set yet. Use !sethome first.');
-      return;
-    }
     bot.chat('Going to home...');
     bot.pathfinder.setMovements(defaultMove);
     bot.pathfinder.setGoal(new goals.GoalBlock(homePosition.x, homePosition.y, homePosition.z));
@@ -155,8 +155,30 @@ async function handleCommand(command) {
   }
 
   else if (command === '!pvp') {
-    bot.chat('Beast Mode PVP enabled with simulated 100 CPS!');
     startPVP();
+  }
+
+  else if (command === '!pvpop') {
+    stopPVP();
+  }
+
+  else if (command === '!set') {
+    const bed = bot.findBlock({
+      matching: block => bot.isABed(block),
+      maxDistance: 5
+    });
+
+    if (!bed) {
+      bot.chat('No bed nearby to set spawn point!');
+      return;
+    }
+
+    bot.activateBlock(bed).then(() => {
+      bot.chat('Respawn point set on bed.');
+      bedPosition = bed.position;
+    }).catch(err => {
+      bot.chat("Couldn't set spawn point: " + err.message);
+    });
   }
 
   else {
@@ -169,6 +191,8 @@ async function eatFood() {
   const foodItem = bot.inventory.items().find(item =>
     item.name.includes('bread') ||
     item.name.includes('apple') ||
+    item.name.includes('melon') ||
+    item.name.includes('salmon') ||
     item.name.includes('cooked')
   );
 
@@ -252,16 +276,56 @@ bot.on('time', () => {
   }
 });
 
-// ====== Beast Mode PVP ======
+// ====== Beast Mode PvP ======
 function startPVP() {
-  setInterval(() => {
-    const targets = bot.nearestEntity(entity =>
-      entity.type === 'mob' || entity.type === 'player'
-    );
-    if (targets) {
-      bot.attack(targets);
+  if (pvpActive) return;
+  pvpActive = true;
+  bot.chat('💥 Ultra Beast PvP Activated!');
+
+  pvpInterval = setInterval(async () => {
+    if (!pvpActive) return;
+
+    // Heal if low health
+    if (bot.health < 15) {
+      await eatFood();
     }
-  }, 10); // 100 CPS simulated (every 10ms)
+
+    // Find nearest target (mob or player excluding bot itself)
+    const target = bot.nearestEntity(entity =>
+      (entity.type === 'mob' || entity.type === 'player') &&
+      entity.username !== bot.username
+    );
+
+    if (target) {
+      await bot.lookAt(target.position.offset(0, target.height, 0), true);
+
+      // Jump for critical hit
+      if (bot.entity.onGround) {
+        bot.setControlState('jump', true);
+        setTimeout(() => {
+          bot.setControlState('jump', false);
+        }, 100);
+      }
+
+      bot.attack(target);
+      const dist = bot.entity.position.distanceTo(target.position);
+      if (dist > 3) {
+        const mcData = require('minecraft-data')(bot.version);
+        const defaultMove = new Movements(bot, mcData);
+        bot.pathfinder.setMovements(defaultMove);
+        bot.pathfinder.setGoal(new goals.GoalFollow(target, 1), true);
+      }
+    }
+  }, 10); // near-100 CPS
+}
+
+function stopPVP() {
+  if (!pvpActive) return;
+  pvpActive = false;
+  clearInterval(pvpInterval);
+  bot.setControlState('jump', false);
+  bot.pathfinder.setGoal(null);
+  bot.chat('💤 PvP mode deactivated.');
 }
 
 // ====== Error Handling ======
