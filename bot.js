@@ -1,5 +1,5 @@
 /**
- * XP Farm Bot for Minecraft Java Server
+ * XP Farm Bot with Swimming Capability
  * Server: 54.169.77.84:25565
  * Author: RareAura Automation Setup
  */
@@ -19,16 +19,18 @@ bot.loadPlugin(pathfinder);
 bot.on('spawn', () => {
   const mcData = require('minecraft-data')(bot.version);
   const defaultMove = new Movements(bot, mcData);
-  
-  // Ignore liquids & lava while moving
+
+  // ====== Movement Configuration ======
+  defaultMove.allowSprinting = true;
+  defaultMove.canSwim = true; // Enable swimming
+  defaultMove.liquidCost = 1; // Treat water as normal terrain
   defaultMove.allow1by1towers = false;
-  defaultMove.scafoldingBlocks = [];
-  defaultMove.liquidCost = Infinity;
   defaultMove.allowParkour = false;
+  defaultMove.scafoldingBlocks = [];
 
   bot.chat('Bot online. Moving to farm location...');
 
-  // Move to specified coordinates on spawn
+  // ====== Move to Farm Coordinates ======
   const farmGoal = new goals.GoalBlock(-422, 64, -1480);
   bot.pathfinder.setMovements(defaultMove);
   bot.pathfinder.setGoal(farmGoal);
@@ -47,6 +49,14 @@ bot.on('chat', (username, message) => {
 
   const mcData = require('minecraft-data')(bot.version);
   const defaultMove = new Movements(bot, mcData);
+
+  // Enable swimming in follow mode too
+  defaultMove.allowSprinting = true;
+  defaultMove.canSwim = true;
+  defaultMove.liquidCost = 1;
+  defaultMove.allow1by1towers = false;
+  defaultMove.allowParkour = false;
+  defaultMove.scafoldingBlocks = [];
 
   if (message === '/follow') {
     const target = bot.players['RareAura']?.entity;
