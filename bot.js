@@ -11,7 +11,7 @@ const bot = mineflayer.createBot({
   host: '54.169.77.84',
   port: 25565,
   username: 'FarmBot1',
-  version: '1.21' // Replace with your exact server version if different
+  version: '1.21' // Replace with your server version if different
 });
 
 bot.loadPlugin(pathfinder);
@@ -117,7 +117,7 @@ async function handleCommand(command) {
   }
 }
 
-// ====== Eat Food (Async/Await 1.21 Compatible) ======
+// ====== Eat Food (Fixed) ======
 async function eatFood() {
   const foodItem = bot.inventory.items().find(item =>
     item.name.includes('bread') ||
@@ -128,12 +128,18 @@ async function eatFood() {
   if (foodItem) {
     try {
       await bot.equip(foodItem, 'hand');
-      await bot.consumeFood(); // Updated for Mineflayer 1.21 compatibility
-      bot.chat(`Eating ${foodItem.name}`);
-      console.log(`Eating ${foodItem.name}`);
+      bot.consume((err) => {
+        if (err) {
+          bot.chat("Couldn't eat food: " + err.message);
+          console.log("Couldn't eat food:", err);
+        } else {
+          bot.chat(`Eating ${foodItem.name}`);
+          console.log(`Eating ${foodItem.name}`);
+        }
+      });
     } catch (err) {
-      bot.chat("Couldn't eat food: " + err.message);
-      console.log("Couldn't eat food:", err);
+      bot.chat("Couldn't equip food: " + err.message);
+      console.log("Couldn't equip food:", err);
     }
   } else {
     bot.chat('No food found!');
