@@ -1,5 +1,5 @@
 /**
- * RareAura Beast PvP + Mob Killer Bot - No Escape Mode
+ * RareAura Beast PvP + Mob Killer Bot - No Escape Mode + Spawn & Bed Set
  * Author: RareAura
  */
 
@@ -29,6 +29,14 @@ if (fs.existsSync(expFile)) {
 
 let target = null;
 let pvpInterval = null;
+
+// ====== Go to spawn point when spawned ======
+bot.once('spawn', async () => {
+  const spawnPos = new Vec3(98, 68, 436);
+  bot.pathfinder.setMovements(defaultMove);
+  await bot.pathfinder.goto(new goals.GoalBlock(spawnPos.x, spawnPos.y, spawnPos.z));
+  bot.chat('✅ Reached spawn point.');
+});
 
 // ====== Auto Eat Loop ======
 setInterval(async () => {
@@ -61,6 +69,24 @@ bot.on('chat', async (username, message) => {
       bot.chat('No axe found in inventory.');
     }
   }
+
+  // ====== !set command to right-click nearest bed ======
+  if (message === '!set') {
+    const bed = bot.findBlock({
+      matching: block => block.name.includes('bed'),
+      maxDistance: 6
+    });
+    if (bed) {
+      try {
+        await bot.activateBlock(bed);
+        bot.chat('🛏️ Bed set as spawn point!');
+      } catch (err) {
+        bot.chat('❌ Failed to set bed spawn: ' + err.message);
+      }
+    } else {
+      bot.chat('No bed found nearby.');
+    }
+  }
 });
 
 // ====== When Bot is Hurt (Players & Mobs) ======
@@ -87,7 +113,6 @@ async function engageBeastMode() {
 
   const axe = bot.inventory.items().find(i => i.name.includes('axe'));
   if (axe) await bot.equip(axe, 'hand');
-  else bot.chat('⚠️ No axe equipped, attacking barehanded.');
 
   pvpInterval = setInterval(() => {
     if (!target || !target.isValid) {
