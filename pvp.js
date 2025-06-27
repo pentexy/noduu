@@ -1,5 +1,5 @@
 /**
- * RareAura PvP Bot - Axe Killer AI with AutoEat, Critical Hits, MLG Clutch
+ * RareAura PvP + Mob Beast Bot - No Escape Axe Killer AI
  * Author: RareAura
  */
 
@@ -12,7 +12,7 @@ const Vec3 = require('vec3');
 const bot = mineflayer.createBot({
   host: '51.20.105.167',
   port: 25565,
-  username: 'RareAuraPVP',
+  username: 'RareAuraNoEscape',
   version: '1.21'
 });
 
@@ -63,25 +63,23 @@ bot.on('chat', async (username, message) => {
   }
 });
 
-// ====== When Bot is Hurt by Player ======
+// ====== When Bot is Hurt by Player or Mob ======
 bot.on('entitySwingArm', (entity) => {
-  if (entity.type !== 'player' || entity.username === bot.username) return;
+  if (!entity || entity.id === bot.entity.id) return;
 
-  const attacker = bot.players[entity.username]?.entity;
+  const attacker = bot.entities[entity.id];
   if (!attacker) return;
 
-  const distance = bot.entity.position.distanceTo(attacker.position);
-  if (distance < 4) { // attack range
-    if (!target) {
-      target = attacker;
-      bot.chat(`🔥 New PvP target: ${entity.username}`);
-      engagePvP();
-    }
+  const dist = bot.entity.position.distanceTo(attacker.position);
+  if (dist < 4 && !target) {
+    target = attacker;
+    bot.chat(`🔥 New No-Escape Target: ${entity.username || entity.name}`);
+    engageBeastMode();
   }
 });
 
-// ====== Engage PvP ======
-async function engagePvP() {
+// ====== Engage Beast PvP Mode ======
+async function engageBeastMode() {
   if (!target) return;
 
   const axe = bot.inventory.items().find(i => i.name.includes('axe'));
@@ -92,25 +90,17 @@ async function engagePvP() {
     if (!target || !target.isValid) {
       clearInterval(pvpInterval);
       target = null;
-      bot.chat('✅ Target defeated. PvP stopped.');
+      bot.chat('✅ Target slain. Beast mode off.');
       pvpExperience.kills += 1;
       fs.writeFileSync(expFile, JSON.stringify(pvpExperience, null, 2));
       return;
     }
 
-    const dist = bot.entity.position.distanceTo(target.position);
-    if (dist > 25) {
-      bot.chat('❌ Target too far, stopping PvP.');
-      clearInterval(pvpInterval);
-      target = null;
-      return;
-    }
-
-    // Move to target
+    // Relentless follow – NO ESCAPE
     bot.pathfinder.setMovements(defaultMove);
-    bot.pathfinder.setGoal(new goals.GoalFollow(target, 1), true);
+    bot.pathfinder.setGoal(new goals.GoalFollow(target, 0.5), true);
 
-    // Critical hit jump if on ground
+    // Critical jump hits
     if (bot.entity.onGround) {
       bot.setControlState('jump', true);
       setTimeout(() => bot.setControlState('jump', false), 150);
