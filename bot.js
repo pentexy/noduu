@@ -12,7 +12,7 @@ const mineflayerCraft = require('mineflayer-craft').plugin;
 const bot = mineflayer.createBot({
   host: '54.169.77.84',
   port: 25565,
-  username: 'Tech', // Replace with bot username
+  username: 'XPFARMbotOP', // Replace with bot username
 });
 
 bot.loadPlugin(pathfinder);
