@@ -1,5 +1,5 @@
 /**
- * RareAura Beast PvP + Mob Killer Bot - No Escape Mode + Spawn Move + Radius Fix
+ * RareAura Beast PvP + Mob Killer Bot - No Escape Mode + Clutch Trainer
  * Author: RareAura
  */
 
@@ -28,14 +28,14 @@ if (fs.existsSync(expFile)) {
 }
 
 let target = null;
-let beastInterval = null;
+let pvpInterval = null;
 
-// ====== Go to specific spawn point when spawned ======
+// ====== Go to spawn point when spawned ======
 bot.once('spawn', async () => {
   const spawnPos = new Vec3(84, 63, 442);
   bot.pathfinder.setMovements(defaultMove);
-  bot.pathfinder.setGoal(new goals.GoalBlock(spawnPos.x, spawnPos.y, spawnPos.z));
-  bot.chat('✅ Arrived at spawn position.');
+  await bot.pathfinder.goto(new goals.GoalBlock(spawnPos.x, spawnPos.y, spawnPos.z));
+  bot.chat('✅ Reached spawn point.');
 });
 
 // ====== Auto Eat Loop ======
@@ -69,6 +69,65 @@ bot.on('chat', async (username, message) => {
       bot.chat('No axe found in inventory.');
     }
   }
+
+  // ====== !testcl command to build tower, jump, and clutch ======
+  if (message === '!testcl') {
+    const stone = bot.inventory.items().find(i => i.name.includes('stone') || i.name.includes('dirt') || i.name.includes('block'));
+    if (!stone) {
+      bot.chat('❌ No blocks in inventory to build tower.');
+      return;
+    }
+
+    try {
+      bot.chat('🧱 Building 10-block tower for clutch test...');
+      await bot.equip(stone, 'hand');
+
+      // Build tower of 10 blocks
+      for (let i = 0; i < 10; i++) {
+        const below = bot.blockAt(bot.entity.position.offset(0, -1, 0));
+        await bot.placeBlock(below, new Vec3(0, 1, 0));
+        await bot.look(bot.entity.yaw, 0);
+        await bot.setControlState('jump', true);
+        await bot.waitForTicks(10);
+        await bot.setControlState('jump', false);
+      }
+
+      bot.chat('⛏️ Tower done, jumping off...');
+      bot.setControlState('forward', true);
+      setTimeout(() => bot.setControlState('forward', false), 500);
+
+    } catch (err) {
+      bot.chat(`❌ Failed tower build: ${err.message}`);
+    }
+  }
+});
+
+// ====== Water Clutch Helper Function ======
+async function performWaterClutch() {
+  const waterBucket = bot.inventory.items().find(i => i.name.includes('bucket'));
+  if (!waterBucket) {
+    bot.chat('❌ No water bucket in inventory!');
+    return;
+  }
+
+  try {
+    await bot.equip(waterBucket, 'hand');
+
+    const posBelow = bot.entity.position.offset(0, -1, 0);
+    await bot.look(bot.entity.yaw, Math.PI / 2, true); // look straight down
+    await bot.placeBlock(bot.blockAt(posBelow), new Vec3(0, 1, 0));
+
+    bot.chat('💧 Water Clutch Successful!');
+  } catch (err) {
+    bot.chat(`❌ Failed clutch: ${err.message}`);
+  }
+}
+
+// ====== Auto clutch when falling fast (≥4 block fall) ======
+bot.on('physicsTick', async () => {
+  if (bot.entity.velocity.y < -0.5 && bot.entity.position.y < bot.entity.previousPosition.y - 4) {
+    await performWaterClutch();
+  }
 });
 
 // ====== When Bot is Hurt (Players & Mobs) ======
@@ -96,12 +155,10 @@ async function engageBeastMode() {
   if (axe) await bot.equip(axe, 'hand');
   else bot.chat('⚠️ No axe equipped, attacking barehanded.');
 
-  beastInterval = setInterval(() => {
+  pvpInterval = setInterval(() => {
     if (!target || !target.isValid) {
-      clearInterval(beastInterval);
+      clearInterval(pvpInterval);
       target = null;
-      bot.setControlState('sprint', false);
-      bot.setControlState('forward', false);
       bot.chat('✅ Target slain. Beast mode off.');
       pvpExperience.kills += 1;
       fs.writeFileSync(expFile, JSON.stringify(pvpExperience, null, 2));
@@ -110,16 +167,14 @@ async function engageBeastMode() {
 
     const dist = bot.entity.position.distanceTo(target.position);
 
-    // Chase mode if target is >4 blocks
     if (dist > 4) {
-      bot.pathfinder.setMovements(defaultMove);
-      bot.pathfinder.setGoal(new goals.GoalFollow(target, 0.5), true);
+      // Sprint to catch up
       bot.setControlState('sprint', true);
-      bot.setControlState('forward', true);
+      bot.pathfinder.setGoal(new goals.GoalFollow(target, 1), true);
     } else {
-      // Stop moving, engage beast attack mode
-      bot.setControlState('sprint', false);
-      bot.setControlState('forward', false);
+      // Stop sprinting, attack
+      bot.clearControlStates();
+      bot.pathfinder.setGoal(new goals.GoalFollow(target, 0.5), true);
 
       // Critical jump hits
       if (bot.entity.onGround) {
@@ -135,23 +190,6 @@ async function engageBeastMode() {
 
   }, 10); // every 10ms for 100 CPS
 }
-
-// ====== MLG Clutch ======
-bot.on('physicsTick', async () => {
-  if (bot.entity.velocity.y < -0.5) { // falling fast
-    const waterBucket = bot.inventory.items().find(i => i.name.includes('bucket'));
-    if (waterBucket) {
-      try {
-        await bot.equip(waterBucket, 'hand');
-        const below = bot.entity.position.offset(0, -1, 0);
-        await bot.placeBlock(bot.blockAt(below), new Vec3(0, 1, 0));
-        bot.chat('💧 MLG Clutch!');
-      } catch (err) {
-        // Silent fail if cannot clutch
-      }
-    }
-  }
-});
 
 // ====== Error Handling ======
 bot.on('kicked', console.log);
