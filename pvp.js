@@ -1,5 +1,5 @@
 /**
- * RareAura Beast PvP + Mob Killer Bot - No Escape Mode + Accurate Clutch
+ * RareAura Beast PvP + Mob Killer Bot - Jump Tower + No Quit
  * Author: RareAura
  */
 
@@ -39,21 +39,29 @@ bot.once('spawn', async () => {
   bot.chat('✅ Arrived at spawn position.');
 });
 
-// ====== Auto Eat Loop ======
+// ====== Auto Eat Loop with jump tower heal ======
 setInterval(async () => {
   if (bot.food < 15) {
+    const inFight = target !== null;
+
     const food = bot.inventory.items().find(i =>
       i.name.includes('bread') ||
       i.name.includes('apple') ||
       i.name.includes('cooked')
     );
+
     if (food) {
-      try {
-        await bot.equip(food, 'hand');
-        await bot.consume();
-        bot.chat(`🍗 Auto ate ${food.name}`);
-      } catch (err) {
-        bot.chat("Couldn't auto eat: " + err.message);
+      if (inFight) {
+        bot.chat('⚠️ Low food in PvP - tower heal + clutch!');
+        await buildTowerForHeal(food);
+      } else {
+        try {
+          await bot.equip(food, 'hand');
+          await bot.consume();
+          bot.chat(`🍗 Auto ate ${food.name}`);
+        } catch (err) {
+          bot.chat("Couldn't auto eat: " + err.message);
+        }
       }
     }
   }
@@ -69,6 +77,20 @@ bot.on('chat', async (username, message) => {
     } else {
       bot.chat('No axe found in inventory.');
     }
+  }
+
+  // ====== !tclu command to test clutch ======
+  if (message === '!tclu') {
+    const blockItem = bot.inventory.items().find(i => i.name.includes('stone') || i.name.includes('dirt'));
+    if (!blockItem) {
+      bot.chat('No blocks to build tower for clutch test.');
+      return;
+    }
+    bot.chat('🧪 Clutch test starting...');
+    await buildTower(10);
+    bot.chat('🧪 Jumping for clutch test!');
+    bot.setControlState('jump', true);
+    setTimeout(() => bot.setControlState('jump', false), 500);
   }
 
   // ====== !set command to right-click nearest bed ======
@@ -87,33 +109,6 @@ bot.on('chat', async (username, message) => {
     } else {
       bot.chat('No bed found nearby.');
     }
-  }
-
-  // ====== !tclu command to test clutch ======
-  if (message === '!tclu') {
-    const stone = bot.inventory.items().find(i => i.name.includes('stone') || i.name.includes('dirt'));
-    if (!stone) {
-      bot.chat('No blocks to build a tower for clutch test.');
-      return;
-    }
-
-    // Build up 10 blocks
-    bot.chat('🧪 Starting clutch test...');
-    for (let i = 0; i < 10; i++) {
-      const below = bot.entity.position.offset(0, -1, 0);
-      try {
-        await bot.equip(stone, 'hand');
-        await bot.placeBlock(bot.blockAt(below), new Vec3(0, 1, 0));
-        await bot.look(bot.entity.yaw, -Math.PI / 2, true);
-      } catch (err) {
-        bot.chat('❌ Tower build failed: ' + err.message);
-        return;
-      }
-    }
-
-    // Jump down for clutch
-    bot.setControlState('jump', true);
-    setTimeout(() => bot.setControlState('jump', false), 500);
   }
 });
 
@@ -142,6 +137,13 @@ async function engageBeastMode() {
   else bot.chat('⚠️ No axe equipped, attacking barehanded.');
 
   beastInterval = setInterval(() => {
+    const heldItem = bot.inventory.slots[bot.getEquipmentDestSlot('hand')];
+    if (!heldItem || heldItem.durability === 0) {
+      bot.chat('🛑 Axe broken - stopping attack!');
+      clearInterval(beastInterval);
+      return;
+    }
+
     if (!target || !target.isValid) {
       clearInterval(beastInterval);
       target = null;
@@ -173,11 +175,51 @@ async function engageBeastMode() {
         bot.attack(target);
       }
     }
-
   }, 10);
 }
 
-// ====== MLG Clutch with accurate previousY tracking ======
+// ====== Build Tower Function with jump + place ======
+async function buildTower(height) {
+  const blockItem = bot.inventory.items().find(i => i.name.includes('stone') || i.name.includes('dirt'));
+  if (!blockItem) {
+    bot.chat('No blocks to build tower.');
+    return;
+  }
+  await bot.equip(blockItem, 'hand');
+
+  for (let i = 0; i < height; i++) {
+    if (!bot.entity.onGround) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+      continue;
+    }
+    bot.setControlState('jump', true);
+    await new Promise(resolve => setTimeout(resolve, 300)); // wait mid jump
+    try {
+      const below = bot.entity.position.offset(0, -1, 0);
+      await bot.placeBlock(bot.blockAt(below), new Vec3(0, 1, 0));
+    } catch (err) {
+      bot.chat('❌ Tower build failed: ' + err.message);
+      bot.setControlState('jump', false);
+      return;
+    }
+    bot.setControlState('jump', false);
+    await new Promise(resolve => setTimeout(resolve, 200)); // wait landing
+  }
+}
+
+// ====== Build Tower for heal ======
+async function buildTowerForHeal(food) {
+  await buildTower(6);
+  try {
+    await bot.equip(food, 'hand');
+    await bot.consume();
+    bot.chat(`🍗 Ate ${food.name} after tower build.`);
+  } catch (err) {
+    bot.chat("Couldn't eat after tower build: " + err.message);
+  }
+}
+
+// ====== MLG Clutch with previousY tracking ======
 bot.on('physicsTick', async () => {
   if (previousY === null) previousY = bot.entity.position.y;
 
