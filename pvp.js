@@ -1,5 +1,5 @@
 /**
- * RareAura Beast PvP + Mob Killer Bot - No Escape Mode + Spawn Move + Radius Fix
+ * RareAura Beast PvP + Mob Killer Bot - No Escape Mode + Auto Tower Heal Clutch
  * Author: RareAura
  */
 
@@ -29,6 +29,7 @@ if (fs.existsSync(expFile)) {
 
 let target = null;
 let beastInterval = null;
+let lastY = 0;
 
 // ====== Go to specific spawn point when spawned ======
 bot.once('spawn', async () => {
@@ -36,17 +37,23 @@ bot.once('spawn', async () => {
   bot.pathfinder.setMovements(defaultMove);
   bot.pathfinder.setGoal(new goals.GoalBlock(spawnPos.x, spawnPos.y, spawnPos.z));
   bot.chat('✅ Arrived at spawn position.');
+  lastY = bot.entity.position.y;
 });
 
-// ====== Auto Eat Loop ======
+// ====== Auto Eat + Tower Heal Clutch ======
 setInterval(async () => {
-  if (bot.food < 15) {
-    const food = bot.inventory.items().find(i =>
-      i.name.includes('bread') ||
-      i.name.includes('apple') ||
-      i.name.includes('cooked')
-    );
-    if (food) {
+  const food = bot.inventory.items().find(i =>
+    i.name.includes('bread') ||
+    i.name.includes('apple') ||
+    i.name.includes('cooked')
+  );
+
+  if (bot.food < 4) {
+    if (target) {
+      // PvP ongoing, tower heal clutch
+      bot.chat('🍗 Low food during PvP, building tower to heal + clutch!');
+      await buildTowerAndClutch(6);
+    } else if (food) {
       try {
         await bot.equip(food, 'hand');
         await bot.consume();
@@ -58,7 +65,7 @@ setInterval(async () => {
   }
 }, 5000);
 
-// ====== Equip Axe Command ======
+// ====== Equip Axe + Commands ======
 bot.on('chat', async (username, message) => {
   if (message === '!take') {
     const axe = bot.inventory.items().find(i => i.name.includes('axe'));
@@ -69,11 +76,31 @@ bot.on('chat', async (username, message) => {
       bot.chat('No axe found in inventory.');
     }
   }
+
+  if (message === '!tclu') {
+    await buildTowerAndClutch(10);
+  }
+
+  if (message === '!set') {
+    const bed = bot.findBlock({
+      matching: block => block.name.includes('bed'),
+      maxDistance: 6
+    });
+    if (bed) {
+      try {
+        await bot.activateBlock(bed);
+        bot.chat('🛏️ Bed set as spawn point!');
+      } catch (err) {
+        bot.chat('❌ Failed to set bed spawn: ' + err.message);
+      }
+    } else {
+      bot.chat('No bed found nearby.');
+    }
+  }
 });
 
 // ====== When Bot is Hurt (Players & Mobs) ======
 bot.on('entityHurt', (entity) => {
-  // Check if the bot itself was hurt by an attacker
   if (!entity || entity.id !== bot.entity.id) return;
 
   const attackers = Object.values(bot.entities).filter(e =>
@@ -110,48 +137,82 @@ async function engageBeastMode() {
 
     const dist = bot.entity.position.distanceTo(target.position);
 
-    // Chase mode if target is >4 blocks
     if (dist > 4) {
+      // Chase mode
       bot.pathfinder.setMovements(defaultMove);
       bot.pathfinder.setGoal(new goals.GoalFollow(target, 0.5), true);
       bot.setControlState('sprint', true);
       bot.setControlState('forward', true);
     } else {
-      // Stop moving, engage beast attack mode
+      // Attack mode
       bot.setControlState('sprint', false);
       bot.setControlState('forward', false);
 
-      // Critical jump hits
       if (bot.entity.onGround) {
         bot.setControlState('jump', true);
         setTimeout(() => bot.setControlState('jump', false), 150);
       }
 
-      // Attack with simulated 100 CPS
       for (let i = 0; i < 10; i++) {
         bot.attack(target);
       }
     }
 
-  }, 10); // every 10ms for 100 CPS
+  }, 10);
 }
 
-// ====== MLG Clutch ======
+// ====== Accurate Water Bucket Clutch ======
 bot.on('physicsTick', async () => {
-  if (bot.entity.velocity.y < -0.5) { // falling fast
-    const waterBucket = bot.inventory.items().find(i => i.name.includes('bucket'));
-    if (waterBucket) {
-      try {
-        await bot.equip(waterBucket, 'hand');
-        const below = bot.entity.position.offset(0, -1, 0);
-        await bot.placeBlock(bot.blockAt(below), new Vec3(0, 1, 0));
-        bot.chat('💧 MLG Clutch!');
-      } catch (err) {
-        // Silent fail if cannot clutch
-      }
+  if (bot.entity.velocity.y < -0.5 && (lastY - bot.entity.position.y) >= 4) {
+    await performWaterClutch();
+  }
+  lastY = bot.entity.position.y;
+});
+
+async function performWaterClutch() {
+  const waterBucket = bot.inventory.items().find(i => i.name.includes('bucket'));
+  if (waterBucket) {
+    try {
+      await bot.equip(waterBucket, 'hand');
+      const below = bot.entity.position.offset(0, -1, 0);
+      await bot.placeBlock(bot.blockAt(below), new Vec3(0, 1, 0));
+      bot.chat('💧 MLG Clutch!');
+    } catch (err) {
+      bot.chat("❌ Failed MLG: " + err.message);
     }
   }
-});
+}
+
+// ====== Build Tower and Clutch Function ======
+async function buildTowerAndClutch(height) {
+  const block = bot.inventory.items().find(i =>
+    i.name.includes('stone') || i.name.includes('dirt') || i.name.includes('planks')
+  );
+
+  if (!block) {
+    bot.chat("❌ No blocks to build tower.");
+    return;
+  }
+
+  try {
+    await bot.equip(block, 'hand');
+    for (let i = 0; i < height; i++) {
+      const below = bot.blockAt(bot.entity.position.offset(0, -1, 0));
+      if (below) await bot.placeBlock(below, new Vec3(0, 1, 0));
+      await bot.setControlState('jump', true);
+      await bot.waitForTicks(10);
+      await bot.setControlState('jump', false);
+    }
+    bot.chat(`🗼 Built ${height}-block tower, jumping to clutch.`);
+    bot.setControlState('sprint', true);
+    bot.setControlState('jump', true);
+    setTimeout(() => {
+      bot.clearControlStates();
+    }, 1000);
+  } catch (err) {
+    bot.chat("❌ Tower build error: " + err.message);
+  }
+}
 
 // ====== Error Handling ======
 bot.on('kicked', console.log);
