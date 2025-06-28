@@ -105,7 +105,7 @@ async function engageBeastMode() {
       bot.setControlState('sprint', true);
       bot.setControlState('forward', true);
       bot.setControlState('jump', false);
-      bot.chat('🏃 Chasing target...');
+      bot.chat('');
     } else {
       // Stop sprint, engage beast mode with 100 CPS spam
       bot.clearControlStates(); // Clear all before beast mode
