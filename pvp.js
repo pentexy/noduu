@@ -1,5 +1,5 @@
 /**
- * RareAura Beast PvP + Mob Killer Bot - No Escape Mode
+ * RareAura Beast PvP + Mob Killer Bot - No Escape Mode + Sprint Chase + Crits
  * Author: RareAura
  */
 
@@ -42,7 +42,7 @@ setInterval(async () => {
       try {
         await bot.equip(food, 'hand');
         await bot.consume();
-        bot.chat(`ðŸ— Auto ate ${food.name}`);
+        bot.chat(`🍗 Auto ate ${food.name}`);
       } catch (err) {
         bot.chat("Couldn't auto eat: " + err.message);
       }
@@ -56,7 +56,7 @@ bot.on('chat', async (username, message) => {
     const axe = bot.inventory.items().find(i => i.name.includes('axe'));
     if (axe) {
       await bot.equip(axe, 'hand');
-      bot.chat(`ðŸª“ Axe equipped: ${axe.name}`);
+      bot.chat(`🪓 Axe equipped: ${axe.name}`);
     } else {
       bot.chat('No axe found in inventory.');
     }
@@ -65,18 +65,16 @@ bot.on('chat', async (username, message) => {
 
 // ====== When Bot is Hurt (Players & Mobs) ======
 bot.on('entityHurt', (entity) => {
-  // Check if the bot itself was hurt by an attacker
   if (!entity || entity.id !== bot.entity.id) return;
 
   const attackers = Object.values(bot.entities).filter(e =>
-    e.type === 'player' || e.type === 'mob'
-  ).filter(e =>
-    e.position.distanceTo(bot.entity.position) < 4
+    (e.type === 'player' || e.type === 'mob') &&
+    e.position.distanceTo(bot.entity.position) < 6
   );
 
-  if (attackers.length > 0 && !target) {
+  if (attackers.length > 0) {
     target = attackers[0];
-    bot.chat(`ðŸ”¥ New Target Acquired: ${target.username || target.name}`);
+    bot.chat(`🔥 New Target Acquired: ${target.username || target.name}`);
     engageBeastMode();
   }
 });
@@ -87,23 +85,35 @@ async function engageBeastMode() {
 
   const axe = bot.inventory.items().find(i => i.name.includes('axe'));
   if (axe) await bot.equip(axe, 'hand');
-  else bot.chat('âš ï¸ No axe equipped, attacking barehanded.');
+  else bot.chat('⚠️ No axe equipped, attacking barehanded.');
 
+  clearInterval(pvpInterval);
   pvpInterval = setInterval(() => {
     if (!target || !target.isValid) {
       clearInterval(pvpInterval);
       target = null;
-      bot.chat('âœ… Target slain. Beast mode off.');
+      bot.clearControlStates();
+      bot.chat('✅ Target slain. Beast mode off.');
       pvpExperience.kills += 1;
       fs.writeFileSync(expFile, JSON.stringify(pvpExperience, null, 2));
       return;
     }
 
-    // Follow target forever â€“ NO ESCAPE
+    const dist = bot.entity.position.distanceTo(target.position);
+
+    // Sprint if target is escaping (>3 blocks away)
+    if (dist > 3) {
+      bot.setControlState('forward', true);
+      bot.setControlState('sprint', true);
+    } else {
+      bot.clearControlStates();
+    }
+
+    // Always follow target
     bot.pathfinder.setMovements(defaultMove);
     bot.pathfinder.setGoal(new goals.GoalFollow(target, 0.5), true);
 
-    // Critical jump hits
+    // Jump for crits
     if (bot.entity.onGround) {
       bot.setControlState('jump', true);
       setTimeout(() => bot.setControlState('jump', false), 150);
@@ -119,16 +129,16 @@ async function engageBeastMode() {
 
 // ====== MLG Clutch ======
 bot.on('physicsTick', async () => {
-  if (bot.entity.velocity.y < -0.5) { // falling fast
+  if (bot.entity.velocity.y < -0.5) {
     const waterBucket = bot.inventory.items().find(i => i.name.includes('bucket'));
     if (waterBucket) {
       try {
         await bot.equip(waterBucket, 'hand');
         const below = bot.entity.position.offset(0, -1, 0);
         await bot.placeBlock(bot.blockAt(below), new Vec3(0, 1, 0));
-        bot.chat('ðŸ’§ MLG Clutch!');
+        bot.chat('💧 MLG Clutch!');
       } catch (err) {
-        // Silent fail if cannot clutch
+        // Silent fail
       }
     }
   }
