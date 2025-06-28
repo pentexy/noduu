@@ -8,7 +8,7 @@ import json
 BOT_TOKEN = input("🔐 Enter your bot token: ").strip()
 API_ID = 26416419
 API_HASH = "c109c77f5823c847b1aeb7fbd4990cc4"
-OWNER_ID = 7703308577
+OWNER_ID = 7339063037
 USER_DATA_FILE = "users.json"
 
 # === INIT BOT ===
@@ -38,7 +38,7 @@ async def add_user(user_id):
 async def start_handler(client, message: Message):
     await add_user(message.from_user.id)
     await message.reply(
-        f"**Hey {message.from_user.mention}, welcome to our bot !**"
+        f"**HeLLO SIR {message.from_user.mention}, welcome to our bot !**"
     )
 
 @bot.on_message(filters.command("panel") & filters.user(OWNER_ID))
