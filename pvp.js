@@ -1,5 +1,5 @@
 /**
- * RareAura Beast PvP + Mob Killer Bot - No Escape Mode + Sprint Chase
+ * RareAura Beast PvP + Mob Killer Bot - No Escape Sprint & Beast Mode
  * Author: RareAura
  */
 
@@ -99,17 +99,18 @@ async function engageBeastMode() {
     }
 
     const dist = bot.entity.position.distanceTo(target.position);
-    const isSprinting = target.velocity && (Math.abs(target.velocity.x) > 0.1 || Math.abs(target.velocity.z) > 0.1);
 
-    // If target is sprinting away or far, bot chases with sprint
-    if (dist > 3 || isSprinting) {
-      bot.setControlState('forward', true);
+    if (dist > 6) {
+      // Chase with sprint
       bot.setControlState('sprint', true);
+      bot.setControlState('forward', true);
       bot.setControlState('jump', false);
+      bot.chat('🏃 Chasing target...');
     } else {
-      // Close: stop sprint, do crit jump and 100 CPS spam
-      bot.setControlState('sprint', false);
+      // Stop sprint, engage beast mode with 100 CPS spam
+      bot.clearControlStates(); // Clear all before beast mode
       bot.setControlState('forward', false);
+      bot.setControlState('sprint', false);
 
       if (bot.entity.onGround) {
         bot.setControlState('jump', true);
@@ -119,6 +120,7 @@ async function engageBeastMode() {
       for (let i = 0; i < 10; i++) {
         bot.attack(target);
       }
+      bot.chat('💥 Beast mode engaged!');
     }
 
     // Always follow target
