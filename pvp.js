@@ -1,5 +1,5 @@
 /**
- * RareAura Beast PvP + Mob Killer Bot - No Escape Mode + Sprint Chase + Crits
+ * RareAura Beast PvP + Mob Killer Bot - Sprint Chase & No Escape Mode
  * Author: RareAura
  */
 
@@ -93,7 +93,7 @@ async function engageBeastMode() {
       clearInterval(pvpInterval);
       target = null;
       bot.clearControlStates();
-      bot.chat('✅ Target slain. Beast mode off.');
+      bot.chat('✅ Target slain or lost. Beast mode off.');
       pvpExperience.kills += 1;
       fs.writeFileSync(expFile, JSON.stringify(pvpExperience, null, 2));
       return;
@@ -101,27 +101,32 @@ async function engageBeastMode() {
 
     const dist = bot.entity.position.distanceTo(target.position);
 
-    // Sprint if target is escaping (>3 blocks away)
-    if (dist > 3) {
-      bot.setControlState('forward', true);
-      bot.setControlState('sprint', true);
-    } else {
-      bot.clearControlStates();
-    }
-
-    // Always follow target
+    // Follow target forever – NO ESCAPE
     bot.pathfinder.setMovements(defaultMove);
     bot.pathfinder.setGoal(new goals.GoalFollow(target, 0.5), true);
 
-    // Jump for crits
-    if (bot.entity.onGround) {
-      bot.setControlState('jump', true);
-      setTimeout(() => bot.setControlState('jump', false), 150);
-    }
+    // Check if target is sprinting (for players only)
+    const targetEntity = bot.players[target.username]?.entity;
+    const isSprinting = targetEntity ? targetEntity.metadata?.some(m => m.key === 0 && (m.value & 0x08)) : false;
 
-    // Attack with simulated 100 CPS
-    for (let i = 0; i < 10; i++) {
-      bot.attack(target);
+    if (dist > 3 || isSprinting) {
+      // If far or target sprinting, bot sprints & chases but stops attacking
+      bot.setControlState('forward', true);
+      bot.setControlState('sprint', true);
+      bot.clearControlState('jump');
+    } else {
+      // Close to target: stop sprint, do crit jump and attack spam
+      bot.clearControlState('sprint');
+
+      if (bot.entity.onGround) {
+        bot.setControlState('jump', true);
+        setTimeout(() => bot.setControlState('jump', false), 150);
+      }
+
+      // Attack with simulated 100 CPS
+      for (let i = 0; i < 10; i++) {
+        bot.attack(target);
+      }
     }
 
   }, 10); // every 10ms for 100 CPS
