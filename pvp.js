@@ -1,5 +1,5 @@
 /**
- * RareAura Beast PvP + Mob Killer Bot - Jump Tower + No Quit
+ * RareAura Beast PvP + Mob Killer Bot - No Escape Mode + Spawn Move + Radius Fix
  * Author: RareAura
  */
 
@@ -29,7 +29,6 @@ if (fs.existsSync(expFile)) {
 
 let target = null;
 let beastInterval = null;
-let previousY = null;
 
 // ====== Go to specific spawn point when spawned ======
 bot.once('spawn', async () => {
@@ -39,29 +38,21 @@ bot.once('spawn', async () => {
   bot.chat('✅ Arrived at spawn position.');
 });
 
-// ====== Auto Eat Loop with jump tower heal ======
+// ====== Auto Eat Loop ======
 setInterval(async () => {
   if (bot.food < 15) {
-    const inFight = target !== null;
-
     const food = bot.inventory.items().find(i =>
       i.name.includes('bread') ||
       i.name.includes('apple') ||
       i.name.includes('cooked')
     );
-
     if (food) {
-      if (inFight) {
-        bot.chat('⚠️ Low food in PvP - tower heal + clutch!');
-        await buildTowerForHeal(food);
-      } else {
-        try {
-          await bot.equip(food, 'hand');
-          await bot.consume();
-          bot.chat(`🍗 Auto ate ${food.name}`);
-        } catch (err) {
-          bot.chat("Couldn't auto eat: " + err.message);
-        }
+      try {
+        await bot.equip(food, 'hand');
+        await bot.consume();
+        bot.chat(`🍗 Auto ate ${food.name}`);
+      } catch (err) {
+        bot.chat("Couldn't auto eat: " + err.message);
       }
     }
   }
@@ -78,42 +69,11 @@ bot.on('chat', async (username, message) => {
       bot.chat('No axe found in inventory.');
     }
   }
-
-  // ====== !tclu command to test clutch ======
-  if (message === '!tclu') {
-    const blockItem = bot.inventory.items().find(i => i.name.includes('stone') || i.name.includes('dirt'));
-    if (!blockItem) {
-      bot.chat('No blocks to build tower for clutch test.');
-      return;
-    }
-    bot.chat('🧪 Clutch test starting...');
-    await buildTower(10);
-    bot.chat('🧪 Jumping for clutch test!');
-    bot.setControlState('jump', true);
-    setTimeout(() => bot.setControlState('jump', false), 500);
-  }
-
-  // ====== !set command to right-click nearest bed ======
-  if (message === '!set') {
-    const bed = bot.findBlock({
-      matching: block => block.name.includes('bed'),
-      maxDistance: 6
-    });
-    if (bed) {
-      try {
-        await bot.activateBlock(bed);
-        bot.chat('🛏️ Bed set as spawn point!');
-      } catch (err) {
-        bot.chat('❌ Failed to set bed spawn: ' + err.message);
-      }
-    } else {
-      bot.chat('No bed found nearby.');
-    }
-  }
 });
 
 // ====== When Bot is Hurt (Players & Mobs) ======
 bot.on('entityHurt', (entity) => {
+  // Check if the bot itself was hurt by an attacker
   if (!entity || entity.id !== bot.entity.id) return;
 
   const attackers = Object.values(bot.entities).filter(e =>
@@ -137,13 +97,6 @@ async function engageBeastMode() {
   else bot.chat('⚠️ No axe equipped, attacking barehanded.');
 
   beastInterval = setInterval(() => {
-    const heldItem = bot.inventory.slots[bot.getEquipmentDestSlot('hand')];
-    if (!heldItem || heldItem.durability === 0) {
-      bot.chat('🛑 Axe broken - stopping attack!');
-      clearInterval(beastInterval);
-      return;
-    }
-
     if (!target || !target.isValid) {
       clearInterval(beastInterval);
       target = null;
@@ -157,73 +110,35 @@ async function engageBeastMode() {
 
     const dist = bot.entity.position.distanceTo(target.position);
 
+    // Chase mode if target is >4 blocks
     if (dist > 4) {
       bot.pathfinder.setMovements(defaultMove);
       bot.pathfinder.setGoal(new goals.GoalFollow(target, 0.5), true);
       bot.setControlState('sprint', true);
       bot.setControlState('forward', true);
     } else {
+      // Stop moving, engage beast attack mode
       bot.setControlState('sprint', false);
       bot.setControlState('forward', false);
 
+      // Critical jump hits
       if (bot.entity.onGround) {
         bot.setControlState('jump', true);
         setTimeout(() => bot.setControlState('jump', false), 150);
       }
 
+      // Attack with simulated 100 CPS
       for (let i = 0; i < 10; i++) {
         bot.attack(target);
       }
     }
-  }, 10);
+
+  }, 10); // every 10ms for 100 CPS
 }
 
-// ====== Build Tower Function with jump + place ======
-async function buildTower(height) {
-  const blockItem = bot.inventory.items().find(i => i.name.includes('stone') || i.name.includes('dirt'));
-  if (!blockItem) {
-    bot.chat('No blocks to build tower.');
-    return;
-  }
-  await bot.equip(blockItem, 'hand');
-
-  for (let i = 0; i < height; i++) {
-    if (!bot.entity.onGround) {
-      await new Promise(resolve => setTimeout(resolve, 100));
-      continue;
-    }
-    bot.setControlState('jump', true);
-    await new Promise(resolve => setTimeout(resolve, 300)); // wait mid jump
-    try {
-      const below = bot.entity.position.offset(0, -1, 0);
-      await bot.placeBlock(bot.blockAt(below), new Vec3(0, 1, 0));
-    } catch (err) {
-      bot.chat('❌ Tower build failed: ' + err.message);
-      bot.setControlState('jump', false);
-      return;
-    }
-    bot.setControlState('jump', false);
-    await new Promise(resolve => setTimeout(resolve, 200)); // wait landing
-  }
-}
-
-// ====== Build Tower for heal ======
-async function buildTowerForHeal(food) {
-  await buildTower(6);
-  try {
-    await bot.equip(food, 'hand');
-    await bot.consume();
-    bot.chat(`🍗 Ate ${food.name} after tower build.`);
-  } catch (err) {
-    bot.chat("Couldn't eat after tower build: " + err.message);
-  }
-}
-
-// ====== MLG Clutch with previousY tracking ======
+// ====== MLG Clutch ======
 bot.on('physicsTick', async () => {
-  if (previousY === null) previousY = bot.entity.position.y;
-
-  if (bot.entity.velocity.y < -0.5 && bot.entity.position.y < previousY - 4) {
+  if (bot.entity.velocity.y < -0.5) { // falling fast
     const waterBucket = bot.inventory.items().find(i => i.name.includes('bucket'));
     if (waterBucket) {
       try {
@@ -236,8 +151,6 @@ bot.on('physicsTick', async () => {
       }
     }
   }
-
-  previousY = bot.entity.position.y;
 });
 
 // ====== Error Handling ======
