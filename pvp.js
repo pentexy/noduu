@@ -120,7 +120,7 @@ async function engageBeastMode() {
       for (let i = 0; i < 10; i++) {
         bot.attack(target);
       }
-      bot.chat('💥 Beast mode engaged!');
+      bot.chat('');
     }
 
     // Always follow target
