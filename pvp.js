@@ -1,5 +1,5 @@
 /**
- * RareAura Beast PvP + Mob Killer Bot - No Escape Mode + Sprint Chase
+ * RareAura Beast PvP + Mob Killer Bot - No Escape Mode + Spawn Move + Radius Fix
  * Author: RareAura
  */
 
@@ -29,6 +29,14 @@ if (fs.existsSync(expFile)) {
 
 let target = null;
 let beastInterval = null;
+
+// ====== Go to specific spawn point when spawned ======
+bot.once('spawn', async () => {
+  const spawnPos = new Vec3(84, 63, 442);
+  bot.pathfinder.setMovements(defaultMove);
+  bot.pathfinder.setGoal(new goals.GoalBlock(spawnPos.x, spawnPos.y, spawnPos.z));
+  bot.chat('✅ Arrived at spawn position.');
+});
 
 // ====== Auto Eat Loop ======
 setInterval(async () => {
@@ -102,8 +110,8 @@ async function engageBeastMode() {
 
     const dist = bot.entity.position.distanceTo(target.position);
 
-    // Chase mode if target is >6 blocks
-    if (dist > 6) {
+    // Chase mode if target is >4 blocks
+    if (dist > 4) {
       bot.pathfinder.setMovements(defaultMove);
       bot.pathfinder.setGoal(new goals.GoalFollow(target, 0.5), true);
       bot.setControlState('sprint', true);
