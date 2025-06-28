@@ -1,5 +1,5 @@
 /**
- * RareAura Beast PvP + Mob Killer Bot - No Escape Sprint + Beast Mode
+ * RareAura Beast PvP + Mob Killer Bot - No Escape Mode + Sprint Chase
  * Author: RareAura
  */
 
@@ -50,6 +50,19 @@ setInterval(async () => {
   }
 }, 5000);
 
+// ====== Equip Axe Command ======
+bot.on('chat', async (username, message) => {
+  if (message === '!take') {
+    const axe = bot.inventory.items().find(i => i.name.includes('axe'));
+    if (axe) {
+      await bot.equip(axe, 'hand');
+      bot.chat(`🪓 Axe equipped: ${axe.name}`);
+    } else {
+      bot.chat('No axe found in inventory.');
+    }
+  }
+});
+
 // ====== When Bot is Hurt (Players & Mobs) ======
 bot.on('entityHurt', (entity) => {
   // Check if the bot itself was hurt by an attacker
@@ -57,30 +70,30 @@ bot.on('entityHurt', (entity) => {
 
   const attackers = Object.values(bot.entities).filter(e =>
     (e.type === 'player' || e.type === 'mob') &&
-    e.position.distanceTo(bot.entity.position) < 6
+    e.position.distanceTo(bot.entity.position) < 4
   );
 
-  if (attackers.length > 0) {
+  if (attackers.length > 0 && !target) {
     target = attackers[0];
-    bot.chat(`🔥 Target locked: ${target.username || target.name}`);
+    bot.chat(`🔥 New Target Acquired: ${target.username || target.name}`);
     engageBeastMode();
   }
 });
 
 // ====== Engage Beast Mode PvP ======
-function engageBeastMode() {
+async function engageBeastMode() {
   if (!target) return;
 
   const axe = bot.inventory.items().find(i => i.name.includes('axe'));
-  if (axe) bot.equip(axe, 'hand');
+  if (axe) await bot.equip(axe, 'hand');
+  else bot.chat('⚠️ No axe equipped, attacking barehanded.');
 
-  clearInterval(beastInterval);
   beastInterval = setInterval(() => {
     if (!target || !target.isValid) {
       clearInterval(beastInterval);
       target = null;
-      bot.clearControlState('sprint');
-      bot.clearControlState('forward');
+      bot.setControlState('sprint', false);
+      bot.setControlState('forward', false);
       bot.chat('✅ Target slain. Beast mode off.');
       pvpExperience.kills += 1;
       fs.writeFileSync(expFile, JSON.stringify(pvpExperience, null, 2));
@@ -89,18 +102,16 @@ function engageBeastMode() {
 
     const dist = bot.entity.position.distanceTo(target.position);
 
-    // Chase mode
+    // Chase mode if target is >6 blocks
     if (dist > 6) {
       bot.pathfinder.setMovements(defaultMove);
       bot.pathfinder.setGoal(new goals.GoalFollow(target, 0.5), true);
-      if (!bot.getControlState('sprint')) bot.setControlState('sprint', true);
-      if (!bot.getControlState('forward')) bot.setControlState('forward', true);
-    }
-
-    // Beast attack mode within 6 blocks
-    if (dist <= 6) {
-      bot.clearControlState('sprint');
-      bot.clearControlState('forward');
+      bot.setControlState('sprint', true);
+      bot.setControlState('forward', true);
+    } else {
+      // Stop moving, engage beast attack mode
+      bot.setControlState('sprint', false);
+      bot.setControlState('forward', false);
 
       // Critical jump hits
       if (bot.entity.onGround) {
@@ -108,13 +119,13 @@ function engageBeastMode() {
         setTimeout(() => bot.setControlState('jump', false), 150);
       }
 
-      // 100 CPS attack spam
+      // Attack with simulated 100 CPS
       for (let i = 0; i < 10; i++) {
         bot.attack(target);
       }
     }
 
-  }, 10); // Every 10ms for high aggression
+  }, 10); // every 10ms for 100 CPS
 }
 
 // ====== MLG Clutch ======
