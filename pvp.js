@@ -1,5 +1,5 @@
 /**
- * RareAura Beast PvP + Mob Killer Bot - Sprint Chase & No Escape Mode
+ * RareAura Beast PvP + Mob Killer Bot - No Escape Mode + Sprint Chase
  * Author: RareAura
  */
 
@@ -68,11 +68,12 @@ bot.on('entityHurt', (entity) => {
   if (!entity || entity.id !== bot.entity.id) return;
 
   const attackers = Object.values(bot.entities).filter(e =>
-    (e.type === 'player' || e.type === 'mob') &&
-    e.position.distanceTo(bot.entity.position) < 6
+    e.type === 'player' || e.type === 'mob'
+  ).filter(e =>
+    e.position.distanceTo(bot.entity.position) < 4
   );
 
-  if (attackers.length > 0) {
+  if (attackers.length > 0 && !target) {
     target = attackers[0];
     bot.chat(`🔥 New Target Acquired: ${target.username || target.name}`);
     engageBeastMode();
@@ -87,54 +88,49 @@ async function engageBeastMode() {
   if (axe) await bot.equip(axe, 'hand');
   else bot.chat('⚠️ No axe equipped, attacking barehanded.');
 
-  clearInterval(pvpInterval);
   pvpInterval = setInterval(() => {
     if (!target || !target.isValid) {
       clearInterval(pvpInterval);
       target = null;
-      bot.clearControlStates();
-      bot.chat('✅ Target slain or lost. Beast mode off.');
+      bot.chat('✅ Target slain. Beast mode off.');
       pvpExperience.kills += 1;
       fs.writeFileSync(expFile, JSON.stringify(pvpExperience, null, 2));
       return;
     }
 
     const dist = bot.entity.position.distanceTo(target.position);
+    const isSprinting = target.velocity && (Math.abs(target.velocity.x) > 0.1 || Math.abs(target.velocity.z) > 0.1);
 
-    // Follow target forever – NO ESCAPE
-    bot.pathfinder.setMovements(defaultMove);
-    bot.pathfinder.setGoal(new goals.GoalFollow(target, 0.5), true);
-
-    // Check if target is sprinting (for players only)
-    const targetEntity = bot.players[target.username]?.entity;
-    const isSprinting = targetEntity ? targetEntity.metadata?.some(m => m.key === 0 && (m.value & 0x08)) : false;
-
+    // If target is sprinting away or far, bot chases with sprint
     if (dist > 3 || isSprinting) {
-      // If far or target sprinting, bot sprints & chases but stops attacking
       bot.setControlState('forward', true);
       bot.setControlState('sprint', true);
-      bot.clearControlState('jump');
+      bot.setControlState('jump', false);
     } else {
-      // Close to target: stop sprint, do crit jump and attack spam
-      bot.clearControlState('sprint');
+      // Close: stop sprint, do crit jump and 100 CPS spam
+      bot.setControlState('sprint', false);
+      bot.setControlState('forward', false);
 
       if (bot.entity.onGround) {
         bot.setControlState('jump', true);
         setTimeout(() => bot.setControlState('jump', false), 150);
       }
 
-      // Attack with simulated 100 CPS
       for (let i = 0; i < 10; i++) {
         bot.attack(target);
       }
     }
+
+    // Always follow target
+    bot.pathfinder.setMovements(defaultMove);
+    bot.pathfinder.setGoal(new goals.GoalFollow(target, 0.5), true);
 
   }, 10); // every 10ms for 100 CPS
 }
 
 // ====== MLG Clutch ======
 bot.on('physicsTick', async () => {
-  if (bot.entity.velocity.y < -0.5) {
+  if (bot.entity.velocity.y < -0.5) { // falling fast
     const waterBucket = bot.inventory.items().find(i => i.name.includes('bucket'));
     if (waterBucket) {
       try {
@@ -143,7 +139,7 @@ bot.on('physicsTick', async () => {
         await bot.placeBlock(bot.blockAt(below), new Vec3(0, 1, 0));
         bot.chat('💧 MLG Clutch!');
       } catch (err) {
-        // Silent fail
+        // Silent fail if cannot clutch
       }
     }
   }
