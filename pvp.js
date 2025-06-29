@@ -64,6 +64,28 @@ setInterval(async () => {
   }
 }, 5000);
 
+bot.on('chat', (username, message) => {
+  if (message.startsWith('!come ')) {
+    const args = message.split(' ');
+    if (args.length === 4) {
+      const x = parseFloat(args[1]);
+      const y = parseFloat(args[2]);
+      const z = parseFloat(args[3]);
+
+      if (!isNaN(x) && !isNaN(y) && !isNaN(z)) {
+        bot.chat(`🚶 Moving to (${x}, ${y}, ${z})`);
+        bot.pathfinder.setMovements(defaultMove);
+        bot.pathfinder.setGoal(new goals.GoalBlock(x, y, z));
+      } else {
+        bot.chat('❌ Invalid coordinates.');
+      }
+    } else {
+      bot.chat('❌ Usage: !come <x> <y> <z>');
+    }
+  }
+});
+
+
 // ====== Main Follow + Protect Loop ======
 setInterval(() => {
   const master = bot.players[masterName]?.entity;
