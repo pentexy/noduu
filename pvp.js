@@ -53,7 +53,7 @@ if (food) {
 try {
 await bot.equip(food, 'hand');
 await bot.consume();
-bot.chat(🍗 Auto ate ${food.name});
+bot.chat('🍗 Auto ate ${food.name}');
 } catch (err) {
 bot.chat("Couldn't auto eat: " + err.message);
 }
