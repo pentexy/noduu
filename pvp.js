@@ -1,5 +1,5 @@
 /**
- * RareAura Beast PvP Protector Bot - Follow & Finish Mode
+ * RareAura Beast PvP Protector Bot - Follow & Finish Mode + Protect Toggle
  * Author: RareAura
  */
 
@@ -21,34 +21,27 @@ const defaultMove = new Movements(bot, mcData);
 let masterName = 'RareAura';
 let attackTarget = null;
 let beastLoop = null;
+let protectMode = false; // Protect off by default
 
 bot.once('spawn', () => {
   bot.chat('✅ RareAura Protector Bot Spawned.');
   bot.pathfinder.setMovements(defaultMove);
 });
 
-// ====== MAIN LOOP ======
-setInterval(() => {
-  const master = bot.players[masterName]?.entity;
-  if (!master) return;
-
-  // FOLLOW RareAura if >5 blocks away
-  const dist = bot.entity.position.distanceTo(master.position);
-  if (dist > 5) {
-    bot.pathfinder.setGoal(new goals.GoalFollow(master, 2));
+// ====== !protect command ======
+bot.on('chat', (username, message) => {
+  if (message === '!protect on') {
+    protectMode = true;
+    bot.chat('🛡️ Protect mode enabled.');
   }
-}, 500);
-
-// ====== Detect if RareAura damages anyone ======
-bot.on('entityHurt', (entity) => {
-  const master = bot.players[masterName]?.entity;
-  if (!master) return;
-
-  // Check if master damaged this entity
-  if (entity.hurtByEntity === master.id) {
-    attackTarget = entity;
-    bot.chat(`🔥 RareAura attacked ${entity.username || entity.name}. Engaging!`);
-    engageNoEscapeMode();
+  if (message === '!protect off') {
+    protectMode = false;
+    bot.chat('❌ Protect mode disabled.');
+    if (beastLoop) {
+      clearInterval(beastLoop);
+      beastLoop = null;
+      attackTarget = null;
+    }
   }
 });
 
@@ -70,7 +63,36 @@ setInterval(async () => {
       }
     }
   }
-}, 5000); // checks every 5 seconds
+}, 5000);
+
+// ====== MAIN LOOP ======
+setInterval(() => {
+  if (!protectMode) return;
+
+  const master = bot.players[masterName]?.entity;
+  if (!master) return;
+
+  // FOLLOW RareAura if >5 blocks away
+  const dist = bot.entity.position.distanceTo(master.position);
+  if (dist > 5) {
+    bot.pathfinder.setGoal(new goals.GoalFollow(master, 2));
+  }
+}, 500);
+
+// ====== Detect if RareAura damages anyone ======
+bot.on('entityHurt', (entity) => {
+  if (!protectMode) return;
+
+  const master = bot.players[masterName]?.entity;
+  if (!master) return;
+
+  // Check if master damaged this entity
+  if (entity.hurtByEntity === master.id) {
+    attackTarget = entity;
+    bot.chat(`🔥 RareAura attacked ${entity.username || entity.name}. Engaging!`);
+    engageNoEscapeMode();
+  }
+});
 
 // ====== Engage No Escape Mode ======
 function engageNoEscapeMode() {
