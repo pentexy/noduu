@@ -1,9 +1,11 @@
 /**
- * RareAura Beast PvP + Mob Killer Bot - Stable Final Fixed
- * Author: RareAura God Mode Fix + ChatGPT Integration
+ * RareAura Beast PvP + Mob Killer Bot - No Escape Mode
+ * Author: RareAura
  */
 
 const mineflayer = require('mineflayer');
+const fs = require('fs');
+const path = require('path');
 const { pathfinder, Movements, goals } = require('mineflayer-pathfinder');
 const Vec3 = require('vec3');
 
@@ -19,131 +21,119 @@ bot.loadPlugin(pathfinder);
 const mcData = require('minecraft-data')(bot.version);
 const defaultMove = new Movements(bot, mcData);
 
-let masterName = 'RareAura';
-let attackTarget = null;
-let playerHitCount = {};
-let beastLoop = null;
+const expFile = path.join(__dirname, 'pvp_experience.json');
+let pvpExperience = { kills: 0 };
+if (fs.existsSync(expFile)) {
+  pvpExperience = JSON.parse(fs.readFileSync(expFile));
+}
 
-bot.once('spawn', () => {
-  bot.chat('✅ RareAura God Mode Bot Spawned.');
-  bot.pathfinder.setMovements(defaultMove);
-});
+let target = null;
+let pvpInterval = null;
 
-// ====== !come command ======
-bot.on('chat', (username, message) => {
-  if (message.startsWith('!come ')) {
-    const args = message.split(' ');
-    if (args.length === 4) {
-      const x = parseFloat(args[1]);
-      const y = parseFloat(args[2]);
-      const z = parseFloat(args[3]);
-      if (!isNaN(x) && !isNaN(y) && !isNaN(z)) {
-        bot.chat(`🚶 Moving to (${x},${y},${z})`);
-        bot.pathfinder.setGoal(new goals.GoalBlock(x, y, z));
-      } else {
-        bot.chat('❌ Invalid coordinates.');
+// ====== Auto Eat Loop ======
+setInterval(async () => {
+  if (bot.food < 15) {
+    const food = bot.inventory.items().find(i =>
+      i.name.includes('bread') ||
+      i.name.includes('apple') ||
+      i.name.includes('cooked')
+    );
+    if (food) {
+      try {
+        await bot.equip(food, 'hand');
+        await bot.consume();
+        bot.chat(`ðŸ— Auto ate ${food.name}`);
+      } catch (err) {
+        bot.chat("Couldn't auto eat: " + err.message);
       }
+    }
+  }
+}, 5000);
+
+// ====== Equip Axe Command ======
+bot.on('chat', async (username, message) => {
+  if (message === '!take') {
+    const axe = bot.inventory.items().find(i => i.name.includes('axe'));
+    if (axe) {
+      await bot.equip(axe, 'hand');
+      bot.chat(`ðŸª“ Axe equipped: ${axe.name}`);
     } else {
-      bot.chat('❌ Usage: !come <x> <y> <z>');
+      bot.chat('No axe found in inventory.');
     }
   }
 });
 
-// ====== MAIN LOOP ======
-setInterval(() => {
-  const master = bot.players[masterName]?.entity;
-  if (!master) {
-    // Only warn once every 10s to avoid spam (optional improvement)
-    // bot.chat('❌ Cannot find RareAura.');
-    return;
-  }
+// ====== When Bot is Hurt (Players & Mobs) ======
+bot.on('entityHurt', (entity) => {
+  // Check if the bot itself was hurt by an attacker
+  if (!entity || entity.id !== bot.entity.id) return;
 
-  // FOLLOW LOGIC
-  const dist = bot.entity.position.distanceTo(master.position);
-  if (dist > 5) {
-    bot.pathfinder.setGoal(new goals.GoalFollow(master, 2));
-  }
-
-  // MOB PROTECTION LOGIC
-  const nearbyMobs = Object.values(bot.entities).filter(e =>
-    e.type === 'mob' && e.position.distanceTo(master.position) < 4
+  const attackers = Object.values(bot.entities).filter(e =>
+    e.type === 'player' || e.type === 'mob'
+  ).filter(e =>
+    e.position.distanceTo(bot.entity.position) < 4
   );
 
-  if (nearbyMobs.length > 0) {
-    attackTarget = nearbyMobs[0];
-    engageNoEscapeMode();
-  }
-
-}, 500); // every 0.5s
-
-// ====== PLAYER ATTACK DETECTION ======
-bot.on('entitySwingArm', (entity) => {
-  const master = bot.players[masterName]?.entity;
-  if (!master || !entity) return;
-
-  if (entity.type === 'player' && entity.username !== bot.username) {
-    const dist = entity.position.distanceTo(master.position);
-    if (dist < 5) {
-      if (!playerHitCount[entity.username]) playerHitCount[entity.username] = 0;
-      playerHitCount[entity.username] += 1;
-
-      if (playerHitCount[entity.username] >= 3) {
-        attackTarget = entity;
-        bot.chat(`⚔️ Player ${entity.username} attacked RareAura 3 times. Engaging!`);
-        engageNoEscapeMode();
-      }
-    }
+  if (attackers.length > 0 && !target) {
+    target = attackers[0];
+    bot.chat(`ðŸ”¥ New Target Acquired: ${target.username || target.name}`);
+    engageBeastMode();
   }
 });
 
-// ====== NO ESCAPE MODE (100 CPS) ======
-function engageNoEscapeMode() {
-  if (!attackTarget) return;
-  if (beastLoop) return; // prevent overlapping
+// ====== Engage Beast Mode PvP ======
+async function engageBeastMode() {
+  if (!target) return;
 
   const axe = bot.inventory.items().find(i => i.name.includes('axe'));
-  if (axe) {
-    bot.equip(axe, 'hand');
-  } else {
-    bot.chat('⚠️ No axe equipped, attacking barehanded.');
-  }
+  if (axe) await bot.equip(axe, 'hand');
+  else bot.chat('âš ï¸ No axe equipped, attacking barehanded.');
 
-  beastLoop = setInterval(() => {
-    if (!attackTarget || !attackTarget.position) {
-      clearInterval(beastLoop);
-      beastLoop = null;
-      attackTarget = null;
-      bot.setControlState('sprint', false);
-      bot.setControlState('forward', false);
-      bot.chat('✅ Target eliminated.');
+  pvpInterval = setInterval(() => {
+    if (!target || !target.isValid) {
+      clearInterval(pvpInterval);
+      target = null;
+      bot.chat('âœ… Target slain. Beast mode off.');
+      pvpExperience.kills += 1;
+      fs.writeFileSync(expFile, JSON.stringify(pvpExperience, null, 2));
       return;
     }
 
-    const dist = bot.entity.position.distanceTo(attackTarget.position);
+    // Follow target forever â€“ NO ESCAPE
+    bot.pathfinder.setMovements(defaultMove);
+    bot.pathfinder.setGoal(new goals.GoalFollow(target, 0.5), true);
 
-    if (dist > 3) {
-      bot.pathfinder.setGoal(new goals.GoalFollow(attackTarget, 1), true);
-      bot.setControlState('sprint', true);
-      bot.setControlState('forward', true);
-    } else {
-      bot.pathfinder.setGoal(null); // stop pathfinder movement
-      bot.setControlState('sprint', false);
-      bot.setControlState('forward', false);
-
-      if (bot.entity.onGround) {
-        bot.setControlState('jump', true);
-        setTimeout(() => bot.setControlState('jump', false), 150);
-      }
-
-      // Attack target rapidly (simulate ~100 CPS)
-      for (let i = 0; i < 10; i++) {
-        bot.attack(attackTarget);
-      }
+    // Critical jump hits
+    if (bot.entity.onGround) {
+      bot.setControlState('jump', true);
+      setTimeout(() => bot.setControlState('jump', false), 150);
     }
 
-  }, 10); // every 10ms for high CPS
+    // Attack with simulated 100 CPS
+    for (let i = 0; i < 10; i++) {
+      bot.attack(target);
+    }
+
+  }, 10); // every 10ms for 100 CPS
 }
 
-// ====== ERROR HANDLING ======
+// ====== MLG Clutch ======
+bot.on('physicsTick', async () => {
+  if (bot.entity.velocity.y < -0.5) { // falling fast
+    const waterBucket = bot.inventory.items().find(i => i.name.includes('bucket'));
+    if (waterBucket) {
+      try {
+        await bot.equip(waterBucket, 'hand');
+        const below = bot.entity.position.offset(0, -1, 0);
+        await bot.placeBlock(bot.blockAt(below), new Vec3(0, 1, 0));
+        bot.chat('ðŸ’§ MLG Clutch!');
+      } catch (err) {
+        // Silent fail if cannot clutch
+      }
+    }
+  }
+});
+
+// ====== Error Handling ======
 bot.on('kicked', console.log);
 bot.on('error', console.log);
