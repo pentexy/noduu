@@ -1,6 +1,6 @@
 /**
- * RareAura Beast PvP + Mob Killer Bot - No Escape Mode + Spawn Move + Radius Fix
- * Author: RareAura
+ * RareAura Beast PvP + Mob Killer Bot - 100 CPS Version
+ * Author: RareAura Final Drop
  */
 
 const mineflayer = require('mineflayer');
@@ -27,24 +27,20 @@ if (fs.existsSync(expFile)) {
   pvpExperience = JSON.parse(fs.readFileSync(expFile));
 }
 
-let target = null;
-let beastInterval = null;
+let masterName = 'RareAura';
+let attackTarget = null;
+let playerHitCount = {};
 
-// ====== Go to specific spawn point when spawned ======
-bot.once('spawn', async () => {
-  const spawnPos = new Vec3(84, 63, 442);
-  bot.pathfinder.setMovements(defaultMove);
-  bot.pathfinder.setGoal(new goals.GoalBlock(spawnPos.x, spawnPos.y, spawnPos.z));
-  bot.chat('✅ Arrived at spawn position.');
+// ====== On Spawn ======
+bot.once('spawn', () => {
+  bot.chat('✅ RareAura Beast Bot Spawned with 100 CPS.');
 });
 
 // ====== Auto Eat Loop ======
 setInterval(async () => {
   if (bot.food < 15) {
     const food = bot.inventory.items().find(i =>
-      i.name.includes('bread') ||
-      i.name.includes('apple') ||
-      i.name.includes('cooked')
+      i.name.includes('bread') || i.name.includes('apple') || i.name.includes('cooked')
     );
     if (food) {
       try {
@@ -58,66 +54,83 @@ setInterval(async () => {
   }
 }, 5000);
 
-// ====== Equip Axe Command ======
-bot.on('chat', async (username, message) => {
-  if (message === '!take') {
-    const axe = bot.inventory.items().find(i => i.name.includes('axe'));
-    if (axe) {
-      await bot.equip(axe, 'hand');
-      bot.chat(`🪓 Axe equipped: ${axe.name}`);
-    } else {
-      bot.chat('No axe found in inventory.');
+// ====== Follow + Protect Loop ======
+setInterval(() => {
+  const master = bot.players[masterName]?.entity;
+  if (!master) return;
+
+  const dist = bot.entity.position.distanceTo(master.position);
+
+  // Follow master if far
+  if (dist > 6) {
+    bot.pathfinder.setMovements(defaultMove);
+    bot.pathfinder.setGoal(new goals.GoalFollow(master, 3));
+  }
+
+  // Check for mob attackers near master
+  const mobAttackers = Object.values(bot.entities).filter(e =>
+    e.type === 'mob' &&
+    e.position.distanceTo(master.position) < 4
+  );
+
+  if (mobAttackers.length > 0) {
+    attackTarget = mobAttackers[0];
+    bot.chat(`🛡️ Protecting RareAura from ${attackTarget.name}`);
+    engageNoEscapeMode();
+  }
+
+}, 1000);
+
+// ====== Player Attack Detection ======
+bot.on('entitySwingArm', (entity) => {
+  const master = bot.players[masterName]?.entity;
+  if (!master || !entity) return;
+
+  if (entity.type === 'player' && entity.username !== bot.username) {
+    const dist = entity.position.distanceTo(master.position);
+    if (dist < 5) {
+      if (!playerHitCount[entity.username]) playerHitCount[entity.username] = 0;
+      playerHitCount[entity.username] += 1;
+
+      if (playerHitCount[entity.username] >= 3) {
+        attackTarget = entity;
+        bot.chat(`⚔️ Player ${entity.username} attacked RareAura 3 times. Engaging!`);
+        engageNoEscapeMode();
+      }
     }
   }
 });
 
-// ====== When Bot is Hurt (Players & Mobs) ======
-bot.on('entityHurt', (entity) => {
-  // Check if the bot itself was hurt by an attacker
-  if (!entity || entity.id !== bot.entity.id) return;
-
-  const attackers = Object.values(bot.entities).filter(e =>
-    (e.type === 'player' || e.type === 'mob') &&
-    e.position.distanceTo(bot.entity.position) < 4
-  );
-
-  if (attackers.length > 0 && !target) {
-    target = attackers[0];
-    bot.chat(`🔥 New Target Acquired: ${target.username || target.name}`);
-    engageBeastMode();
-  }
-});
-
-// ====== Engage Beast Mode PvP ======
-async function engageBeastMode() {
-  if (!target) return;
+// ====== Engage No Escape Mode (100 CPS) ======
+function engageNoEscapeMode() {
+  if (!attackTarget) return;
 
   const axe = bot.inventory.items().find(i => i.name.includes('axe'));
-  if (axe) await bot.equip(axe, 'hand');
+  if (axe) bot.equip(axe, 'hand');
   else bot.chat('⚠️ No axe equipped, attacking barehanded.');
 
-  beastInterval = setInterval(() => {
-    if (!target || !target.isValid) {
-      clearInterval(beastInterval);
-      target = null;
+  const beastLoop = setInterval(() => {
+    if (!attackTarget || !attackTarget.isValid) {
+      clearInterval(beastLoop);
+      attackTarget = null;
       bot.setControlState('sprint', false);
       bot.setControlState('forward', false);
-      bot.chat('✅ Target slain. Beast mode off.');
+      bot.chat('✅ Target eliminated. Returning to RareAura.');
       pvpExperience.kills += 1;
       fs.writeFileSync(expFile, JSON.stringify(pvpExperience, null, 2));
       return;
     }
 
-    const dist = bot.entity.position.distanceTo(target.position);
+    const dist = bot.entity.position.distanceTo(attackTarget.position);
 
-    // Chase mode if target is >4 blocks
-    if (dist > 4) {
+    // Chase if far
+    if (dist > 3) {
       bot.pathfinder.setMovements(defaultMove);
-      bot.pathfinder.setGoal(new goals.GoalFollow(target, 0.5), true);
+      bot.pathfinder.setGoal(new goals.GoalFollow(attackTarget, 1), true);
       bot.setControlState('sprint', true);
       bot.setControlState('forward', true);
     } else {
-      // Stop moving, engage beast attack mode
+      // Stop moving and attack with 100 CPS
       bot.setControlState('sprint', false);
       bot.setControlState('forward', false);
 
@@ -127,13 +140,11 @@ async function engageBeastMode() {
         setTimeout(() => bot.setControlState('jump', false), 150);
       }
 
-      // Attack with simulated 100 CPS
-      for (let i = 0; i < 10; i++) {
-        bot.attack(target);
-      }
+      // True 100 CPS: attack once every 10ms
+      bot.attack(attackTarget);
     }
 
-  }, 10); // every 10ms for 100 CPS
+  }, 10); // every 10ms = 100 CPS
 }
 
 // ====== MLG Clutch ======
@@ -147,7 +158,7 @@ bot.on('physicsTick', async () => {
         await bot.placeBlock(bot.blockAt(below), new Vec3(0, 1, 0));
         bot.chat('💧 MLG Clutch!');
       } catch (err) {
-        // Silent fail if cannot clutch
+        // Silent fail
       }
     }
   }
