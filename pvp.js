@@ -1,6 +1,6 @@
 /**
- * RareAura Beast PvP + Mob Killer Bot - Stable Final
- * Author: RareAura God Mode Fix
+ * RareAura Beast PvP + Mob Killer Bot - Stable Final Fixed
+ * Author: RareAura God Mode Fix + ChatGPT Integration
  */
 
 const mineflayer = require('mineflayer');
@@ -53,7 +53,8 @@ bot.on('chat', (username, message) => {
 setInterval(() => {
   const master = bot.players[masterName]?.entity;
   if (!master) {
-    bot.chat('❌ Cannot find RareAura.');
+    // Only warn once every 10s to avoid spam (optional improvement)
+    // bot.chat('❌ Cannot find RareAura.');
     return;
   }
 
@@ -101,10 +102,14 @@ function engageNoEscapeMode() {
   if (beastLoop) return; // prevent overlapping
 
   const axe = bot.inventory.items().find(i => i.name.includes('axe'));
-  if (axe) bot.equip(axe, 'hand');
+  if (axe) {
+    bot.equip(axe, 'hand');
+  } else {
+    bot.chat('⚠️ No axe equipped, attacking barehanded.');
+  }
 
   beastLoop = setInterval(() => {
-    if (!attackTarget || !attackTarget.isValid) {
+    if (!attackTarget || !attackTarget.position) {
       clearInterval(beastLoop);
       beastLoop = null;
       attackTarget = null;
@@ -121,6 +126,7 @@ function engageNoEscapeMode() {
       bot.setControlState('sprint', true);
       bot.setControlState('forward', true);
     } else {
+      bot.pathfinder.setGoal(null); // stop pathfinder movement
       bot.setControlState('sprint', false);
       bot.setControlState('forward', false);
 
@@ -129,10 +135,13 @@ function engageNoEscapeMode() {
         setTimeout(() => bot.setControlState('jump', false), 150);
       }
 
-      bot.attack(attackTarget); // true 100 CPS (every 10ms)
+      // Attack target rapidly (simulate ~100 CPS)
+      for (let i = 0; i < 10; i++) {
+        bot.attack(attackTarget);
+      }
     }
 
-  }, 10);
+  }, 10); // every 10ms for high CPS
 }
 
 // ====== ERROR HANDLING ======
