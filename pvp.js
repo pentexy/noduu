@@ -1,6 +1,6 @@
 /**
- * RareAura Beast PvP + Mob Killer Bot - 100 CPS Version
- * Author: RareAura Final Drop
+ * RareAura Beast PvP + Mob Killer Bot - Final Working Version
+ * Author: RareAura Stable Drop
  */
 
 const mineflayer = require('mineflayer');
@@ -30,11 +30,21 @@ if (fs.existsSync(expFile)) {
 let masterName = 'RareAura';
 let attackTarget = null;
 let playerHitCount = {};
+let beastLoop = null;
 
 // ====== On Spawn ======
 bot.once('spawn', () => {
-  bot.chat('✅ RareAura Beast Bot Spawned with 100 CPS.');
+  bot.chat('✅ RareAura Beast Bot Spawned.');
 });
+
+
+bot.on('chat', (username, message) => {
+  if (message === '!tcords') {
+    const pos = bot.entity.position;
+    bot.chat(`📍 My current coords: X=${pos.x.toFixed(1)} Y=${pos.y.toFixed(1)} Z=${pos.z.toFixed(1)}`);
+  }
+});
+
 
 // ====== Auto Eat Loop ======
 setInterval(async () => {
@@ -54,32 +64,32 @@ setInterval(async () => {
   }
 }, 5000);
 
-// ====== Follow + Protect Loop ======
+// ====== Main Follow + Protect Loop ======
 setInterval(() => {
   const master = bot.players[masterName]?.entity;
   if (!master) return;
 
   const dist = bot.entity.position.distanceTo(master.position);
 
-  // Follow master if far
-  if (dist > 6) {
+  // Follow RareAura if more than 5 blocks away
+  if (dist > 5) {
     bot.pathfinder.setMovements(defaultMove);
-    bot.pathfinder.setGoal(new goals.GoalFollow(master, 3));
+    bot.pathfinder.setGoal(new goals.GoalFollow(master, 2));
   }
 
-  // Check for mob attackers near master
-  const mobAttackers = Object.values(bot.entities).filter(e =>
+  // === MOB ATTACK CHECK ===
+  const nearbyMobs = Object.values(bot.entities).filter(e =>
     e.type === 'mob' &&
     e.position.distanceTo(master.position) < 4
   );
 
-  if (mobAttackers.length > 0) {
-    attackTarget = mobAttackers[0];
+  if (nearbyMobs.length > 0) {
+    attackTarget = nearbyMobs[0];
     bot.chat(`🛡️ Protecting RareAura from ${attackTarget.name}`);
     engageNoEscapeMode();
   }
 
-}, 1000);
+}, 500); // fast reaction every 0.5s
 
 // ====== Player Attack Detection ======
 bot.on('entitySwingArm', (entity) => {
@@ -101,17 +111,20 @@ bot.on('entitySwingArm', (entity) => {
   }
 });
 
-// ====== Engage No Escape Mode (100 CPS) ======
+// ====== Engage No Escape Mode (True 100 CPS) ======
 function engageNoEscapeMode() {
   if (!attackTarget) return;
+
+  if (beastLoop) return; // prevent overlapping loops
 
   const axe = bot.inventory.items().find(i => i.name.includes('axe'));
   if (axe) bot.equip(axe, 'hand');
   else bot.chat('⚠️ No axe equipped, attacking barehanded.');
 
-  const beastLoop = setInterval(() => {
+  beastLoop = setInterval(() => {
     if (!attackTarget || !attackTarget.isValid) {
       clearInterval(beastLoop);
+      beastLoop = null;
       attackTarget = null;
       bot.setControlState('sprint', false);
       bot.setControlState('forward', false);
@@ -123,14 +136,14 @@ function engageNoEscapeMode() {
 
     const dist = bot.entity.position.distanceTo(attackTarget.position);
 
-    // Chase if far
+    // Chase target if far
     if (dist > 3) {
       bot.pathfinder.setMovements(defaultMove);
       bot.pathfinder.setGoal(new goals.GoalFollow(attackTarget, 1), true);
       bot.setControlState('sprint', true);
       bot.setControlState('forward', true);
     } else {
-      // Stop moving and attack with 100 CPS
+      // Stop moving and attack rapidly
       bot.setControlState('sprint', false);
       bot.setControlState('forward', false);
 
@@ -140,11 +153,11 @@ function engageNoEscapeMode() {
         setTimeout(() => bot.setControlState('jump', false), 150);
       }
 
-      // True 100 CPS: attack once every 10ms
+      // True 100 CPS attack (every 10ms)
       bot.attack(attackTarget);
     }
 
-  }, 10); // every 10ms = 100 CPS
+  }, 10);
 }
 
 // ====== MLG Clutch ======
