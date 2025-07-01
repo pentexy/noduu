@@ -22,9 +22,6 @@ mongo_client = MongoClient(MONGO_URI)
 db = mongo_client.get_database()
 users_col = db[USER_FILE]
 
-# Broadcast state
-broadcast_messages = {}
-
 # /start handler (private only)
 @bot.on_message(filters.private & filters.command("start"))
 async def start(client, message):
@@ -53,7 +50,7 @@ async def start(client, message):
     await message.reply(text, reply_markup=buttons)
 
 # Random replies for non-command messages (private only)
-@bot.on_message(filters.private & filters.text & ~filters.command(["start", "owner", "send"]))
+@bot.on_message(filters.private & filters.text & ~filters.command(["start", "owner", "broadcast"]))
 async def random_reply(client, message):
     replies = ["Hello", "Yo Sir", "Welcome"]
     await message.reply(random.choice(replies))
@@ -68,10 +65,7 @@ async def owner_panel(client, message):
     buttons = InlineKeyboardMarkup(
         [
             [InlineKeyboardButton("👥 Live Users", callback_data="live_users")],
-            [
-                InlineKeyboardButton("📢 Broadcast", callback_data="broadcast"),
-                InlineKeyboardButton("⚙️ Customize", callback_data="customize"),
-            ]
+            [InlineKeyboardButton("⚙️ Customize", callback_data="customize")],
         ]
     )
     await message.reply(panel, reply_markup=buttons)
@@ -107,50 +101,34 @@ async def callbacks(client, callback_query):
         buttons = InlineKeyboardMarkup(
             [
                 [InlineKeyboardButton("👥 Live Users", callback_data="live_users")],
-                [
-                    InlineKeyboardButton("📢 Broadcast", callback_data="broadcast"),
-                    InlineKeyboardButton("⚙️ Customize", callback_data="customize"),
-                ]
+                [InlineKeyboardButton("⚙️ Customize", callback_data="customize")],
             ]
         )
         await callback_query.message.edit(panel, reply_markup=buttons)
-
-    elif data == "broadcast":
-        broadcast_messages[OWNER_ID] = None
-        await callback_query.message.edit(
-            "📝 <b>Send the broadcast message now.\nOnce done, tap /send to confirm.</b>"
-        )
 
     elif data == "customize":
         await callback_query.message.edit("⚙️ <b>Customize options will appear here.</b>")
 
     await callback_query.answer()
 
-# Capture broadcast messages (private only)
-@bot.on_message(filters.private & filters.user(OWNER_ID) & ~filters.command("send"))
-async def save_broadcast(client, message):
-    if OWNER_ID in broadcast_messages:
-        broadcast_messages[OWNER_ID] = message
-        await message.reply("✅ Broadcast message saved. Tap /send to broadcast it.")
-
-# /send to send broadcast (private only)
-@bot.on_message(filters.private & filters.command("send") & filters.user(OWNER_ID))
-async def send_broadcast(client, message):
-    if OWNER_ID in broadcast_messages and broadcast_messages[OWNER_ID]:
+# /broadcast command - reply to message to broadcast it (private only)
+@bot.on_message(filters.private & filters.command("broadcast") & filters.user(OWNER_ID))
+async def broadcast_message(client, message):
+    if message.reply_to_message:
         sent = 0
         failed = 0
         all_users = list(users_col.find({}))
         for user in all_users:
             uid = user["_id"]
             try:
-                await broadcast_messages[OWNER_ID].copy(uid)
+                await message.reply_to_message.copy(uid)
                 sent += 1
-            except:
+            except Exception as e:
+                print(f"❌ Failed to send to {uid}: {e}")
                 failed += 1
         await message.reply(f"✅ Broadcast sent to {sent} users.\n❌ Failed: {failed}")
-        broadcast_messages.pop(OWNER_ID)
     else:
-        await message.reply("⚠️ No broadcast message saved. Use /owner > Broadcast to save one first.")
+        await message.reply("⚠️ Please reply to a message with /broadcast to send it to all users.")
 
 # Forward all user messages to owner (private only, exclude owner)
 @bot.on_message(filters.private & ~filters.user(OWNER_ID))
@@ -166,5 +144,5 @@ async def forward_to_owner(client, message):
         print(f"❌ Failed to forward from {message.from_user.id}: {e}")
 
 # Start bot
-print("TON Update Bot Running Sexy 🔥 With MongoDB (Final Fixed)")
+print("TON Update Bot Running Sexy 🔥 With MongoDB (Broadcast reply-based)")
 bot.run()
