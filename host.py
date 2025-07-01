@@ -4,7 +4,10 @@ from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 api_id = 26416419
 api_hash = "c109c77f5823c847b1aeb7fbd4990cc4"
-main_bot_token = "7904916101:AAE-DQCF7yx84h3VGXjxnaq9AIWOrJQWCi4"
+main_bot_token = "7904916101:AAEdyPf4j-XM2JeaC8ntCUXIvprsjYe3nr0"
+
+# ====== ALLOWED USERS ======
+allowed_users = {7913490752}
 
 main_app = Client("controller_bot", api_id=api_id, api_hash=api_hash, bot_token=main_bot_token)
 
@@ -15,14 +18,33 @@ custom_replies = {}
 broadcast_msgs = {}
 trigger_temp = {}
 
-# ====================== MAIN BOT ======================
+# =========== MAIN BOT HANDLERS ===========
 
 @main_app.on_message(filters.command("start") & filters.private)
 async def start_main(client, message):
+    if message.from_user.id not in allowed_users:
+        await message.reply_text("❌ You are not authorized to use this bot.")
+        return
     await message.reply_text("**please enter your bot token sir !**", parse_mode="markdown")
 
-@main_app.on_message(filters.private & ~filters.command("start"))
+@main_app.on_message(filters.command("add") & filters.private)
+async def add_user(client, message):
+    if message.from_user.id not in allowed_users:
+        await message.reply_text("❌ You are not authorized to use this command.")
+        return
+    try:
+        new_user = int(message.text.split()[1])
+        allowed_users.add(new_user)
+        await message.reply_text(f"✅ User {new_user} added successfully.")
+    except:
+        await message.reply_text("⚠️ Usage: /add {user_id}")
+
+@main_app.on_message(filters.private & ~filters.command(["start", "add"]))
 async def handle_token(client, message):
+    if message.from_user.id not in allowed_users:
+        await message.reply_text("❌ You are not authorized to use this bot.")
+        return
+
     token = message.text.strip()
     owner_id = message.from_user.id
 
@@ -47,7 +69,7 @@ async def handle_token(client, message):
         parse_mode="html"
     )
 
-# ====================== HOSTED BOT HANDLERS ======================
+# =========== HOSTED BOT HANDLERS ===========
 
 def register_hosted_bot_handlers(token):
     bot = hosted_bots[token]
@@ -150,11 +172,11 @@ def register_hosted_bot_handlers(token):
             if reply:
                 await message.reply_text(reply)
 
-# ====================== RUN ======================
+# =========== RUN ===========
 
 async def main():
     await main_app.start()
-    print("Main controller bot running...")
+    print("✅ Main controller bot running only for authorized users...")
     await asyncio.Event().wait()
 
 asyncio.run(main())
