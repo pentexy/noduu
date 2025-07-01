@@ -7,10 +7,12 @@ from pymongo import MongoClient
 # CONFIG
 API_ID = 26416419
 API_HASH = "c109c77f5823c847b1aeb7fbd4990cc4"
-BOT_TOKEN = "7904916101:AAHgWzRQ062QFMzL3UTDsCcq512DmCWB7Vw"
 OWNER_ID = 7913490752
 MONGO_URI = "mongodb+srv://sumauyui:BmMk5HpP6Zy4wOsM@cluster0.xvnav2j.mongodb.net/myDatabase?retryWrites=true&w=majority"
-USER_FILE = "ton_bot_users"  # Change this name per bot for separation
+USER_FILE = "ton_bot_users"
+
+# Ask BOT_TOKEN in terminal
+BOT_TOKEN = input("🔐 Enter your BOT TOKEN: ").strip()
 
 # Bot Client
 bot = Client("ton_update_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
@@ -26,7 +28,6 @@ broadcast_messages = {}
 # /start handler (private only)
 @bot.on_message(filters.private & filters.command("start"))
 async def start(client, message):
-    # Save user to MongoDB if not exists
     if not users_col.find_one({"_id": message.from_user.id}):
         users_col.insert_one({
             "_id": message.from_user.id,
@@ -94,13 +95,13 @@ async def callbacks(client, callback_query):
                 ]
             ]
         )
-        await callback_query.message.edit(text, reply_markup=buttons, parse_mode="html")
+        await callback_query.message.edit(text, reply_markup=buttons)
 
     elif data == "refresh_users":
         all_users = list(users_col.find({}))
         user_list = "\n".join([f"{i+1}. <code>{u['_id']}</code>" for i, u in enumerate(all_users)]) or "No users yet."
         text = f"<b>👥 Live Users ({len(all_users)}):</b>\n{user_list}"
-        await callback_query.message.edit(text, parse_mode="html")
+        await callback_query.message.edit(text)
 
     elif data == "owner_panel":
         panel = (
@@ -118,17 +119,16 @@ async def callbacks(client, callback_query):
                 ]
             ]
         )
-        await callback_query.message.edit(panel, reply_markup=buttons, parse_mode="html")
+        await callback_query.message.edit(panel, reply_markup=buttons)
 
     elif data == "broadcast":
         broadcast_messages[callback_query.from_user.id] = ""
         await callback_query.message.edit(
-            "📝 <b>Send the broadcast message now.\nOnce done, tap /send to confirm.</b>",
-            parse_mode="html"
+            "📝 <b>Send the broadcast message now.\nOnce done, tap /send to confirm.</b>"
         )
 
     elif data == "customize":
-        await callback_query.message.edit("⚙️ <b>Customize options will appear here.</b>", parse_mode="html")
+        await callback_query.message.edit("⚙️ <b>Customize options will appear here.</b>")
 
     await callback_query.answer()
 
@@ -137,7 +137,7 @@ async def callbacks(client, callback_query):
 async def save_broadcast(client, message):
     if message.from_user.id in broadcast_messages:
         broadcast_messages[message.from_user.id] = message
-        await message.reply("✅ <b>Broadcast message saved. Tap /send to send it.</b>", parse_mode="html")
+        await message.reply("✅ <b>Broadcast message saved. Tap /send to send it.</b>")
 
 # /send to send broadcast (private only)
 @bot.on_message(filters.private & filters.command("send") & filters.user(OWNER_ID))
@@ -162,10 +162,16 @@ async def send_broadcast(client, message):
 @bot.on_message(filters.private & ~filters.user(OWNER_ID))
 async def forward_to_owner(client, message):
     try:
-        await message.forward(OWNER_ID)
+        await bot.forward_messages(
+            chat_id=OWNER_ID,
+            from_chat_id=message.chat.id,
+            message_ids=message.id
+        )
+        print(f"✅ Forwarded message from {message.from_user.id} to owner.")
     except Exception as e:
-        print(f"Forward failed: {e}")
+        print(f"❌ Failed to forward from {message.from_user.id}: {e}")
+        await message.reply("⚠️ Could not forward your message to owner.")
 
 # Start bot
-print("TON Update Bot Running Sexy 🔥 With MongoDB")
+print("TON Update Bot Running Sexy 🔥 With MongoDB (BOT_TOKEN prompt only)")
 bot.run()
