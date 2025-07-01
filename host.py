@@ -1,7 +1,7 @@
 import asyncio
 import random
 from pyrogram import Client, filters
-from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
+from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from pymongo import MongoClient
 
 # CONFIG
@@ -67,9 +67,7 @@ async def owner_panel(client, message):
     )
     buttons = InlineKeyboardMarkup(
         [
-            [
-                InlineKeyboardButton("👥 Live Users", callback_data="live_users"),
-            ],
+            [InlineKeyboardButton("👥 Live Users", callback_data="live_users")],
             [
                 InlineKeyboardButton("📢 Broadcast", callback_data="broadcast"),
                 InlineKeyboardButton("⚙️ Customize", callback_data="customize"),
@@ -85,8 +83,7 @@ async def callbacks(client, callback_query):
 
     if data == "live_users":
         all_users = list(users_col.find({}))
-        user_list = "\n".join([f"{i+1}. <code>{u['_id']}</code>" for i, u in enumerate(all_users)]) or "No users yet."
-        text = f"<b>👥 Live Users ({len(all_users)}):</b>\n{user_list}"
+        text = f"<b>👥 Live Users Count: {len(all_users)}</b>"
         buttons = InlineKeyboardMarkup(
             [
                 [
@@ -99,8 +96,7 @@ async def callbacks(client, callback_query):
 
     elif data == "refresh_users":
         all_users = list(users_col.find({}))
-        user_list = "\n".join([f"{i+1}. <code>{u['_id']}</code>" for i, u in enumerate(all_users)]) or "No users yet."
-        text = f"<b>👥 Live Users ({len(all_users)}):</b>\n{user_list}"
+        text = f"<b>👥 Live Users Count: {len(all_users)}</b>"
         await callback_query.message.edit(text)
 
     elif data == "owner_panel":
@@ -110,9 +106,7 @@ async def callbacks(client, callback_query):
         )
         buttons = InlineKeyboardMarkup(
             [
-                [
-                    InlineKeyboardButton("👥 Live Users", callback_data="live_users"),
-                ],
+                [InlineKeyboardButton("👥 Live Users", callback_data="live_users")],
                 [
                     InlineKeyboardButton("📢 Broadcast", callback_data="broadcast"),
                     InlineKeyboardButton("⚙️ Customize", callback_data="customize"),
@@ -122,7 +116,7 @@ async def callbacks(client, callback_query):
         await callback_query.message.edit(panel, reply_markup=buttons)
 
     elif data == "broadcast":
-        broadcast_messages[callback_query.from_user.id] = ""
+        broadcast_messages[OWNER_ID] = None
         await callback_query.message.edit(
             "📝 <b>Send the broadcast message now.\nOnce done, tap /send to confirm.</b>"
         )
@@ -135,26 +129,26 @@ async def callbacks(client, callback_query):
 # Capture broadcast messages (private only)
 @bot.on_message(filters.private & filters.user(OWNER_ID) & ~filters.command("send"))
 async def save_broadcast(client, message):
-    if message.from_user.id in broadcast_messages:
-        broadcast_messages[message.from_user.id] = message
-        await message.reply("✅ <b>Broadcast message saved. Tap /send to send it.</b>")
+    if OWNER_ID in broadcast_messages:
+        broadcast_messages[OWNER_ID] = message
+        await message.reply("✅ Broadcast message saved. Tap /send to broadcast it.")
 
 # /send to send broadcast (private only)
 @bot.on_message(filters.private & filters.command("send") & filters.user(OWNER_ID))
 async def send_broadcast(client, message):
-    if message.from_user.id in broadcast_messages and broadcast_messages[message.from_user.id]:
+    if OWNER_ID in broadcast_messages and broadcast_messages[OWNER_ID]:
         sent = 0
         failed = 0
         all_users = list(users_col.find({}))
         for user in all_users:
             uid = user["_id"]
             try:
-                await broadcast_messages[message.from_user.id].copy(uid)
+                await broadcast_messages[OWNER_ID].copy(uid)
                 sent += 1
             except:
                 failed += 1
         await message.reply(f"✅ Broadcast sent to {sent} users.\n❌ Failed: {failed}")
-        broadcast_messages.pop(message.from_user.id)
+        broadcast_messages.pop(OWNER_ID)
     else:
         await message.reply("⚠️ No broadcast message saved. Use /owner > Broadcast to save one first.")
 
@@ -170,8 +164,7 @@ async def forward_to_owner(client, message):
         print(f"✅ Forwarded message from {message.from_user.id} to owner.")
     except Exception as e:
         print(f"❌ Failed to forward from {message.from_user.id}: {e}")
-        await message.reply("⚠️ Could not forward your message to owner.")
 
 # Start bot
-print("TON Update Bot Running Sexy 🔥 With MongoDB (BOT_TOKEN prompt only)")
+print("TON Update Bot Running Sexy 🔥 With MongoDB (Final Fixed)")
 bot.run()
