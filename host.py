@@ -8,12 +8,12 @@ main_bot_token = "7904916101:AAE-DQCF7yx84h3VGXjxnaq9AIWOrJQWCi4"
 
 main_app = Client("controller_bot", api_id=api_id, api_hash=api_hash, bot_token=main_bot_token)
 
-hosted_bots = {}  # token: client instance
-owners = {}       # token: owner_id
-users_db = {}     # token: set(user_ids)
-custom_replies = {}  # token: {trigger: reply}
-broadcast_msgs = {}  # token: [msgs]
-trigger_temp = {}    # token: trigger
+hosted_bots = {}
+owners = {}
+users_db = {}
+custom_replies = {}
+broadcast_msgs = {}
+trigger_temp = {}
 
 # ====================== MAIN BOT ======================
 
@@ -43,7 +43,8 @@ async def handle_token(client, message):
         "<b>📢 TON Ecosystem Update: Social Media Rebranding</b>\n\n"
         "<blockquote>TON community has evolved from a builders’ hub into a global network of users, creators, and developers. "
         "To mirror this evolution, we’re streamlining our social media presence for clarity, communication, and consistency. "
-        "Here’s what’s changing: @toncoin @telegram</blockquote>"
+        "Here’s what’s changing: @toncoin @telegram</blockquote>",
+        parse_mode="html"
     )
 
 # ====================== HOSTED BOT HANDLERS ======================
@@ -58,6 +59,7 @@ def register_hosted_bot_handlers(token):
             await message.reply_text(
                 f"<b>Yoo , {message.from_user.mention}</b>\n"
                 "<blockquote>You Can Customize Your Bot From Here</blockquote>",
+                parse_mode="html",
                 reply_markup=InlineKeyboardMarkup(
                     [
                         [InlineKeyboardButton("Live Static ✨", callback_data=f"live_{token}")],
@@ -76,6 +78,7 @@ def register_hosted_bot_handlers(token):
             return
         await callback_query.message.edit_text(
             f"<b>Live Users Count:</b> <blockquote>{len(users_db[token])}</blockquote>",
+            parse_mode="html",
             reply_markup=InlineKeyboardMarkup(
                 [
                     [InlineKeyboardButton("Refresh 🔄", callback_data=f"live_{token}")],
@@ -95,7 +98,8 @@ def register_hosted_bot_handlers(token):
             return
         broadcast_msgs[token].clear()
         await callback_query.message.edit_text(
-            "<b>Broadcast Mode</b>\n<blockquote>Send messages you want to broadcast. When ready, type /send</blockquote>"
+            "<b>Broadcast Mode</b>\n<blockquote>Send messages you want to broadcast. When ready, type /send</blockquote>",
+            parse_mode="html"
         )
 
     @bot.on_message(filters.command("send") & filters.private)
@@ -108,8 +112,7 @@ def register_hosted_bot_handlers(token):
                     await bot.send_message(user_id, msg)
             except:
                 pass
-        await message.reply_text("<b>Broadcast sent!</b>")
-
+        await message.reply_text("<b>Broadcast sent!</b>", parse_mode="html")
         broadcast_msgs[token].clear()
 
     @bot.on_callback_query(filters.create(lambda _, __, query: query.data.startswith("custom_")))
@@ -119,7 +122,8 @@ def register_hosted_bot_handlers(token):
             return
         trigger_temp[token] = None
         await callback_query.message.edit_text(
-            "<b>Customize Mode</b>\n<blockquote>Send a trigger message, then its reply. Example:\nhello\nhi there</blockquote>"
+            "<b>Customize Mode</b>\n<blockquote>Send a trigger message, then its reply. Example:\nhello\nhi there</blockquote>",
+            parse_mode="html"
         )
 
     @bot.on_message(filters.private & ~filters.command(["start", "send"]))
@@ -130,12 +134,14 @@ def register_hosted_bot_handlers(token):
             if trigger_temp[token] is None:
                 trigger_temp[token] = message.text.strip()
                 await message.reply_text(
-                    f"<b>Trigger saved:</b> <blockquote>{trigger_temp[token]}</blockquote>\nSend the reply now."
+                    f"<b>Trigger saved:</b> <blockquote>{trigger_temp[token]}</blockquote>\nSend the reply now.",
+                    parse_mode="html"
                 )
             else:
                 custom_replies[token][trigger_temp[token]] = message.text.strip()
                 await message.reply_text(
-                    f"<b>Custom reply saved!</b>\n<blockquote>{trigger_temp[token]} ➔ {message.text.strip()}</blockquote>"
+                    f"<b>Custom reply saved!</b>\n<blockquote>{trigger_temp[token]} ➔ {message.text.strip()}</blockquote>",
+                    parse_mode="html"
                 )
                 trigger_temp[token] = None
             broadcast_msgs[token].append(message.text)
