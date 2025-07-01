@@ -4,7 +4,7 @@ from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 api_id = 26416419
 api_hash = "c109c77f5823c847b1aeb7fbd4990cc4"
-main_bot_token = "7904916101:AAEdyPf4j-XM2JeaC8ntCUXIvprsjYe3nr0"
+main_bot_token = "7904916101:AAHgWzRQ062QFMzL3UTDsCcq512DmCWB7Vw"
 
 # ====== ALLOWED USERS ======
 allowed_users = {7913490752}
