@@ -42,8 +42,8 @@ async def start(client, message):
     buttons = InlineKeyboardMarkup(
         [
             [
-                InlineKeyboardButton("Crypto", url="https://t.me/durov"),
-                InlineKeyboardButton("Durov", url="https://t.me/durov"),
+                InlineKeyboardButton("TONCOIN", url="https://t.me/durov"),
+                InlineKeyboardButton("DUROV SIR", url="https://t.me/durov"),
             ]
         ]
     )
