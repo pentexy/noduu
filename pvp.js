@@ -58,6 +58,39 @@ setInterval(async () => {
   }
 }, 5000);
 
+
+bot.on('chat', async (username, message) => {
+  if (message === '!wear') {
+    const armorSlots = {
+      head: ['helmet'],
+      chest: ['chestplate'],
+      legs: ['leggings'],
+      feet: ['boots']
+    };
+
+    let worn = false;
+
+    for (const [slot, keywords] of Object.entries(armorSlots)) {
+      const item = bot.inventory.items().find(i =>
+        keywords.some(k => i.name.includes(k))
+      );
+      if (item) {
+        try {
+          await bot.equip(item, slot);
+          bot.chat(`🛡️ Equipped ${item.name} on ${slot}`);
+          worn = true;
+        } catch (err) {
+          bot.chat(`❌ Couldn't equip ${item.name}: ${err.message}`);
+        }
+      }
+    }
+
+    if (!worn) {
+      bot.chat('⚠️ No armor pieces found in inventory.');
+    }
+  }
+});
+
 // ====== Equip Axe Command ======
 bot.on('chat', async (username, message) => {
   if (message === '!take') {
