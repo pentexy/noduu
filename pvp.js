@@ -32,7 +32,7 @@ let beastInterval = null;
 
 // ====== Go to specific spawn point when spawned ======
 bot.once('spawn', async () => {
-  const spawnPos = new Vec3(84, 63, 442);
+  const spawnPos = new Vec3(-81, 72, 181);
   bot.pathfinder.setMovements(defaultMove);
   bot.pathfinder.setGoal(new goals.GoalBlock(spawnPos.x, spawnPos.y, spawnPos.z));
   bot.chat('✅ agaya bhai kiski maa chodni hai??.');
