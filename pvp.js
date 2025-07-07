@@ -62,11 +62,11 @@ setInterval(async () => {
 bot.on('chat', async (username, message) => {
   if (message === '!wear') {
     const armorSlots = {
-      head: ['helmet'],
-      chest: ['chestplate'],
-      legs: ['leggings'],
-      feet: ['boots']
-    };
+  head: ['helmet'],
+  torso: ['chestplate'],
+  legs: ['leggings'],
+  feet: ['boots']
+};
 
     let worn = false;
 
