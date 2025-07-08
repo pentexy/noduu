@@ -1,8 +1,11 @@
 from azapi import AZlyrics
 
-api = AZlyrics("duckduckgo")
+# Names should be passed corrrectly
+# If you can't remember, use google or duckduckgo
+# AZlyrics('google')
+api = AZlyrics()
 
 api.artist = "Taylor Swift"
 api.title = "Blank Space"
 
-api.getLyrics(path="C:\\Music\\Lyrics")
+api.getLyrics(save=True)
