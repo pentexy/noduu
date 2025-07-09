@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Agora Voice Chat</title>
+    <script src="https://download.agora.io/sdk/release/AgoraRTC_N.js"></script>
+  </head>
+  <body>
+    <button onclick="startVoiceChat()">Join Voice Chat</button>
+    <script>
+      const client = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
+
+      async function startVoiceChat() {
+        // Replace with your App ID and channel name
+        const appId = "1e9d99dfa22244b8b02266b7f4bf43a7";
+        const channel = "testchannel";
+        const token = null; // Use null if token authentication is off
+
+        await client.join(appId, channel, token, null);
+
+        const localAudioTrack = await AgoraRTC.createMicrophoneAudioTrack();
+        await client.publish([localAudioTrack]);
+
+        console.log("Voice chat started");
+      }
+    </script>
+  </body>
+</html>
