@@ -9,7 +9,7 @@ API_ID = 26416419
 API_HASH = "c109c77f5823c847b1aeb7fbd4990cc4"
 OWNER_ID = 7913490752
 MONGO_URI = "mongodb+srv://sumauyui:BmMk5HpP6Zy4wOsM@cluster0.xvnav2j.mongodb.net/myDatabase?retryWrites=true&w=majority"
-USER_FILE = "crypto_users"
+USER_FILE = "ton_users_update"
 
 # Ask BOT_TOKEN in terminal
 BOT_TOKEN = input("🔐 Enter your BOT TOKEN: ").strip()
