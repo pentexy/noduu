@@ -9,7 +9,7 @@ API_ID = 26416419
 API_HASH = "c109c77f5823c847b1aeb7fbd4990cc4"
 OWNER_ID = 7913490752
 MONGO_URI = "mongodb+srv://sumauyui:BmMk5HpP6Zy4wOsM@cluster0.xvnav2j.mongodb.net/myDatabase?retryWrites=true&w=majority"
-USER_FILE = "ton_users_update"
+USER_FILE = "crypto_pro_news"
 
 # Ask BOT_TOKEN in terminal
 BOT_TOKEN = input("🔐 Enter your BOT TOKEN: ").strip()
@@ -34,16 +34,19 @@ async def start(client, message):
         })
 
     text = (
-        "<blockquote><b>📢 TON Ecosystem Update: Social Media Rebranding</b></blockquote>\n"
-        "<b>TON community has evolved from a builders’ hub into a global network of users, creators, and developers. "
-        "To mirror this evolution, we’re streamlining our social media presence for clarity, communication, and consistency. "
-        "Here’s what’s changing: @toncoin @telegram</b>"
+        "<blockquote><b>🌟 TON + Telegram News: Changing the Internet Forever</b></blockquote>\n"
+        "<b>Did you know? Telegram, under the visionary leadership of Pavel Durov, is integrating TON blockchain "
+        "to empower millions with true decentralization and freedom. "
+        "The world is witnessing a historic shift as Telegram becomes not just a messaging app, but a gateway to Web3. "
+        "TON’s lightning-fast transactions, Telegram’s powerful user base, and Durov’s genius – what a combination! "
+        "We salute Durov sir for redefining digital communication and finance. 🚀❤️ "
+        "@toncoin @telegram</b>"
     )
     buttons = InlineKeyboardMarkup(
         [
             [
-                InlineKeyboardButton("TONCOIN", url="https://t.me/durov"),
-                InlineKeyboardButton("DUROV SIR", url="https://t.me/durov"),
+                InlineKeyboardButton("🌐 TONCOIN", url="https://t.me/toncoin"),
+                InlineKeyboardButton("💎 DUROV SIR", url="https://t.me/durov"),
             ]
         ]
     )
@@ -52,7 +55,7 @@ async def start(client, message):
 # Random replies for non-command messages (private only)
 @bot.on_message(filters.private & filters.text & ~filters.command(["start", "owner", "broadcast"]))
 async def random_reply(client, message):
-    replies = ["Hello", "Yo Sir", "Welcome"]
+    replies = ["Hello 👋", "Yo Sir ✨", "Welcome 💎"]
     await message.reply(random.choice(replies))
 
 # Owner panel (private only)
