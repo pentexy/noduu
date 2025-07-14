@@ -1,12 +1,12 @@
-import asyncio
 from pyrogram import Client, filters
+import asyncio
 
 api_id = 26416419
 api_hash = "c109c77f5823c847b1aeb7fbd4990cc4"
 
 app = Client("clone_userbot", api_id=api_id, api_hash=api_hash)
 
-@app.on_message(filters.command("clone", ".") & filters.reply)
+@app.on_message(filters.command("clone", ".") & filters.me & filters.reply)
 async def clone_profile(client, message):
     replied_user = message.reply_to_message.from_user
     if not replied_user:
@@ -32,9 +32,9 @@ async def clone_profile(client, message):
         await client.set_profile_photo(file)
         count += 1
 
-    await message.reply(f"**ᴄʟᴏɴᴇᴅ {user.first_name}**.")
+    await message.reply(f"**ᴄʟᴏɴᴇᴅ {user.first_name} ᴡɪᴛʜ {count} ᴅᴘs.**")
 
-@app.on_message(filters.command("fuckup", "."))
+@app.on_message(filters.command("fuckup", ".") & filters.me)
 async def fuckup(client, message):
     # Reset name and bio
     await client.update_profile(first_name="ᴅᴇʟᴇᴛᴇᴅ", last_name="")
@@ -48,13 +48,12 @@ async def fuckup(client, message):
     await message.reply("**ғᴜᴄᴋᴜᴘ**\n**ᴀʟʟ ᴄʟᴏɴᴇᴅ ᴅᴀᴛᴀ ʀᴇᴍᴏᴠᴇᴅ.**")
 
 async def main():
-    print("**ᴍɪssɪᴏɴ : sᴛᴀʀᴛɪɴɢ**\nʟᴏɢɪɴ ʀᴇǫᴜɪʀᴇᴅ.")
+    print("**ᴍɪssɪᴏɴ : sᴛᴀʀᴛɪɴɢ**")
     await app.start()
-    print("**ᴍɪssɪᴏɴ : ʀᴇᴀᴅʏ**\nᴜsᴇ .clone ᴀɴᴅ .fuckup.")
-    await idle()
-    await app.stop()
+    print("**ᴍɪssɪᴏɴ : ʀᴇᴀᴅʏ**")
 
-from pyrogram import idle
+    # Keep running
+    await asyncio.Event().wait()
 
 if __name__ == "__main__":
     asyncio.run(main())
