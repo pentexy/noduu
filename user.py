@@ -1,10 +1,34 @@
 import asyncio
+import random
 from telethon import TelegramClient, events, functions, types
 
 api_id = 26416419
 api_hash = "c109c77f5823c847b1aeb7fbd4990cc4"
 
 client = TelegramClient("clone_userbot", api_id, api_hash)
+
+# Replacement mapping for username tweaks
+replacement_map = {
+    "I": "l",
+    "i": "l",
+    "O": "0",
+    "o": "0",
+    "a": "@",
+    "A": "@",
+    "s": "5",
+    "S": "5",
+    "E": "3",
+    "e": "3",
+}
+
+def tweak_username(username):
+    new_username = ""
+    for char in username:
+        if char in replacement_map and random.random() < 0.5:
+            new_username += replacement_map[char]
+        else:
+            new_username += char
+    return new_username
 
 @client.on(events.NewMessage(pattern=r"\.clone", outgoing=True))
 async def clone_profile(event):
@@ -39,8 +63,20 @@ async def clone_profile(event):
                 print("Updated bio.")
             else:
                 print("No bio found.")
-        
-        # Download and set profile photo
+
+        # Tweak username
+        if user.username:
+            tweaked_username = tweak_username(user.username)
+            # Update username
+            try:
+                await client(functions.account.UpdateUsernameRequest(username=tweaked_username))
+                print(f"Username changed to: {tweaked_username}")
+            except Exception as e:
+                print(f"Failed to update username: {e}")
+        else:
+            print("No username to tweak.")
+
+        # Download and set profile photos
         photos = await client.get_profile_photos(user.id)
         count = 0
         for photo in photos:
@@ -51,7 +87,7 @@ async def clone_profile(event):
             count += 1
             print(f"Set photo {count}")
 
-        await event.reply(f"**Cloned {user.first_name} with {count} DPs.**")
+        await event.reply(f"**Cloned {user.first_name} with {count} DPs. Username tweaked.**")
         print("Clone completed.")
 
     except Exception as e:
