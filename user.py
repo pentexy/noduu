@@ -1,34 +1,10 @@
 import asyncio
-import random
 from telethon import TelegramClient, events, functions, types
 
 api_id = 26416419
 api_hash = "c109c77f5823c847b1aeb7fbd4990cc4"
 
 client = TelegramClient("clone_userbot", api_id, api_hash)
-
-# Replacement mapping for username tweaks
-replacement_map = {
-    "I": "l",
-    "i": "l",
-    "O": "0",
-    "o": "0",
-    "a": "@",
-    "A": "@",
-    "s": "5",
-    "S": "5",
-    "E": "3",
-    "e": "3",
-}
-
-def tweak_username(username):
-    new_username = ""
-    for char in username:
-        if char in replacement_map and random.random() < 0.5:
-            new_username += replacement_map[char]
-        else:
-            new_username += char
-    return new_username
 
 @client.on(events.NewMessage(pattern=r"\.clone", outgoing=True))
 async def clone_profile(event):
@@ -64,19 +40,56 @@ async def clone_profile(event):
             else:
                 print("No bio found.")
 
-        # Tweak username
+        # Username cloning logic
         if user.username:
-            tweaked_username = tweak_username(user.username)
-            # Update username
-            try:
-                await client(functions.account.UpdateUsernameRequest(username=tweaked_username))
-                print(f"Username changed to: {tweaked_username}")
-            except Exception as e:
-                print(f"Failed to update username: {e}")
-        else:
-            print("No username to tweak.")
+            original_username = user.username
+            tried_usernames = [original_username]
 
-        # Download and set profile photos
+            try:
+                # Try exact username first
+                await client(functions.account.UpdateUsernameRequest(username=original_username))
+                print(f"Username set exactly: {original_username}")
+            except Exception as e:
+                print(f"Exact username failed: {e}")
+
+                # Define minimal replacements
+                replacements = [
+                    ("ii", "ll"),
+                    ("ll", "ii"),
+                    ("0", "o"),
+                    ("o", "0"),
+                    ("I", "l"),
+                    ("l", "I"),
+                    ("s", "5"),
+                    ("5", "s"),
+                    ("a", "e"),
+                    ("e", "a"),
+                ]
+
+                # Try each replacement only once
+                for old, new in replacements:
+                    if old in original_username:
+                        tweaked_username = original_username.replace(old, new, 1)
+                        if tweaked_username not in tried_usernames:
+                            try:
+                                await client(functions.account.UpdateUsernameRequest(username=tweaked_username))
+                                print(f"Username changed minimally to: {tweaked_username}")
+                                break  # Success
+                            except Exception as e:
+                                print(f"Failed with {old}->{new}: {e}")
+                                tried_usernames.append(tweaked_username)
+                else:
+                    # Fallback: add underscore
+                    fallback_username = original_username + "_"
+                    try:
+                        await client(functions.account.UpdateUsernameRequest(username=fallback_username))
+                        print(f"Username fallback to: {fallback_username}")
+                    except Exception as e:
+                        print(f"All username tweaks failed: {e}")
+        else:
+            print("No username to copy.")
+
+        # Clone profile photos
         photos = await client.get_profile_photos(user.id)
         count = 0
         for photo in photos:
@@ -87,7 +100,7 @@ async def clone_profile(event):
             count += 1
             print(f"Set photo {count}")
 
-        await event.reply(f"**Cloned {user.first_name} with {count} DPs. Username tweaked.**")
+        await event.reply(f"**Cloned {user.first_name} with {count} DPs. Username updated if possible.**")
         print("Clone completed.")
 
     except Exception as e:
