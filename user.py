@@ -1,85 +1,87 @@
-from pyrogram import Client, filters
 import asyncio
+from telethon import TelegramClient, events
 
 api_id = 26416419
 api_hash = "c109c77f5823c847b1aeb7fbd4990cc4"
 
-app = Client("clone_userbot", api_id=api_id, api_hash=api_hash)
+client = TelegramClient("clone_userbot", api_id, api_hash)
 
-@app.on_message(filters.command("clone", ".") & filters.me & filters.reply)
-async def clone_profile(client, message):
+@client.on(events.NewMessage(pattern=r"\.clone"))
+async def clone(event):
     print("Clone command triggered.")
-    replied_user = message.reply_to_message.from_user
-    if not replied_user:
-        await message.reply("**ʀᴇᴘʟʏ ᴛᴏ ᴀ ᴜsᴇʀ ᴛᴏ ᴄʟᴏɴᴇ ᴛʜᴇᴍ**")
-        print("No replied user.")
+    if not event.is_reply:
+        await event.reply("**ʀᴇᴘʟʏ ᴛᴏ ᴀ ᴜsᴇʀ ᴛᴏ ᴄʟᴏɴᴇ ᴛʜᴇᴍ**")
+        print("No reply found.")
         return
 
-    try:
-        user = await client.get_users(replied_user.id)
-        print(f"Fetched user: {user.first_name}")
+    replied = await event.get_reply_message()
+    user = await client.get_entity(replied.sender_id)
+    print(f"Fetched user: {user.first_name}")
 
+    try:
         # Change name
         first_name = user.first_name or ""
         last_name = user.last_name or ""
-        await client.update_profile(first_name=first_name, last_name=last_name)
+        await client(functions.account.UpdateProfileRequest(
+            first_name=first_name,
+            last_name=last_name
+        ))
         print(f"Updated name to: {first_name} {last_name}")
 
         # Change bio
-        if user.bio:
-            await client.update_profile(bio=user.bio)
+        if user.about:
+            await client(functions.account.UpdateProfileRequest(about=user.about))
             print("Updated bio.")
         else:
-            print("No bio found to update.")
+            print("No bio to update.")
 
-        # Download and set all profile photos
-        photos = client.get_profile_photos(user.id)
+        # Get all profile photos
+        photos = await client.get_profile_photos(user)
         count = 0
-        async for photo in photos:
-            print(f"Downloading photo {count+1}")
-            file = await client.download_media(photo.file_id)
-            await client.set_profile_photo(file)
+        for photo in photos:
+            file = await client.download_media(photo, file="dp.jpg")
+            await client(functions.photos.UploadProfilePhotoRequest(
+                file=await client.upload_file("dp.jpg")
+            ))
             print(f"Set photo {count+1}")
             count += 1
 
-        await message.reply(f"**ᴄʟᴏɴᴇᴅ {user.first_name} ᴡɪᴛʜ {count} ᴅᴘs.**")
+        await event.reply(f"**ᴄʟᴏɴᴇᴅ {first_name} ᴡɪᴛʜ {count} ᴅᴘs.**")
         print("Clone completed.")
 
     except Exception as e:
-        await message.reply(f"Error during clone: {e}")
+        await event.reply(f"Error during clone: {e}")
         print(f"Clone error: {e}")
 
-@app.on_message(filters.command("fuckup", ".") & filters.me)
-async def fuckup(client, message):
+@client.on(events.NewMessage(pattern=r"\.fuckup"))
+async def fuckup(event):
     print("Fuckup command triggered.")
     try:
         # Reset name and bio
-        await client.update_profile(first_name="ᴅᴇʟᴇᴛᴇᴅ", last_name="")
-        await client.update_profile(bio="")
+        await client(functions.account.UpdateProfileRequest(first_name="ᴅᴇʟᴇᴛᴇᴅ", last_name=""))
+        await client(functions.account.UpdateProfileRequest(about=""))
         print("Name and bio deleted.")
 
         # Delete all profile photos
-        photos = client.get_profile_photos("me")
+        photos = await client.get_profile_photos('me')
         count = 0
-        async for photo in photos:
-            await client.delete_profile_photos(photo.file_id)
+        for photo in photos:
+            await client(functions.photos.DeletePhotosRequest(id=[photo]))
             print(f"Deleted photo {count+1}")
             count += 1
 
-        await message.reply("**ғᴜᴄᴋᴜᴘ**\n**ᴀʟʟ ᴄʟᴏɴᴇᴅ ᴅᴀᴛᴀ ʀᴇᴍᴏᴠᴇᴅ.**")
+        await event.reply("**ғᴜᴄᴋᴜᴘ**\n**ᴀʟʟ ᴄʟᴏɴᴇᴅ ᴅᴀᴛᴀ ʀᴇᴍᴏᴠᴇᴅ.**")
         print("Fuckup completed.")
 
     except Exception as e:
-        await message.reply(f"Error during fuckup: {e}")
+        await event.reply(f"Error during fuckup: {e}")
         print(f"Fuckup error: {e}")
 
 async def main():
     print("**ᴍɪssɪᴏɴ : sᴛᴀʀᴛɪɴɢ**")
-    await app.start()
+    await client.start()
     print("**ᴍɪssɪᴏɴ : ʀᴇᴀᴅʏ**")
-
-    # Keep running
-    await asyncio.Event().wait()
+    await client.run_until_disconnected()
 
 if __name__ == "__main__":
     asyncio.run(main())
