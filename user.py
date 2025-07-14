@@ -1,7 +1,7 @@
 import asyncio
 from pyrogram import Client, filters
 
-api_id = 26416419  # replace with your api id
+api_id = 26416419
 api_hash = "c109c77f5823c847b1aeb7fbd4990cc4"
 
 app = Client("clone_userbot", api_id=api_id, api_hash=api_hash)
@@ -47,8 +47,14 @@ async def fuckup(client, message):
 
     await message.reply("**ғᴜᴄᴋᴜᴘ**\n**ᴀʟʟ ᴄʟᴏɴᴇᴅ ᴅᴀᴛᴀ ʀᴇᴍᴏᴠᴇᴅ.**")
 
-if __name__ == "__main__":
+async def main():
     print("**ᴍɪssɪᴏɴ : sᴛᴀʀᴛɪɴɢ**\nʟᴏɢɪɴ ʀᴇǫᴜɪʀᴇᴅ.")
-    app.start()
+    await app.start()
     print("**ᴍɪssɪᴏɴ : ʀᴇᴀᴅʏ**\nᴜsᴇ .clone ᴀɴᴅ .fuckup.")
-    app.idle()
+    await idle()
+    await app.stop()
+
+from pyrogram import idle
+
+if __name__ == "__main__":
+    asyncio.run(main())
