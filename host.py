@@ -7,7 +7,7 @@ from pymongo import MongoClient
 # CONFIG
 API_ID = 26416419
 API_HASH = "c109c77f5823c847b1aeb7fbd4990cc4"
-OWNER_ID = 7072373613
+OWNER_ID = 7690821053
 MONGO_URI = "mongodb+srv://sumauyui:BmMk5HpP6Zy4wOsM@cluster0.xvnav2j.mongodb.net/myDatabase?retryWrites=true&w=majority"
 USER_FILE = "cryto_news"
 
