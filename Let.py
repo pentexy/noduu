@@ -758,7 +758,7 @@ async def set_bot_config(client: Client, message: Message):
             return
         updates[k] = v
 
-    # Read existing config
+# Read existing config
     cfg = {}
     if os.path.exists(CONFIG_FILE):
         try:
@@ -778,8 +778,11 @@ async def set_bot_config(client: Client, message: Message):
     await message.reply_text("✅ Config updated, restarting bot...")
     await asyncio.sleep(2)
     os.execv(sys.executable, [sys.executable] + sys.argv)
-    
-    async def main():
+
+
+# ✅ MAIN BOT STARTUP LOGIC (this must be OUTSIDE all functions)
+
+async def main():
     await app.start()
     await send_startup_message()
     print("✅ Bot is running...")
