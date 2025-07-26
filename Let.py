@@ -54,7 +54,7 @@ LOG_FILE = f"{NAME}.txt"
 
 #================================================================================================================================#
 
-client = AsyncIOMotorClient(DB)
+client = AsyncIOMotorClient(mongodb+srv://Axxa:Axxay@cluster0.veadsay.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0)
 db = client[DBNAME]
 users_collection = db["users"]
 settings_collection = db["settings"]
