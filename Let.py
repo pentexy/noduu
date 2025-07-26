@@ -16,7 +16,7 @@ import sys
 # Dynamic Config Section
 # ===================
 DBNAME = "RankFather"
-TOKEN = "x:c"
+TOKEN = "8260087085:AAEWb6nrIsVR14gVQpAvamkT55Lp9LqBS0k"
 NAME   = "riorandi"
 CONFIG_FILE = "riorandi_config.json"
 # Allow overriding by passing a config path as the first CLI argument, i.e.:
@@ -65,7 +65,7 @@ if not TOKEN or not NAME:
     raise ValueError("TOKEN and NAME must be provided. Use /setbotconfig or create bot_config.json to set them.")
 
 app = Client(NAME, api_id=20028561, api_hash="0f3793daaf4d3905e55b0e44d8719cad",
-            bot_token=8260087085:AAEWb6nrIsVR14gVQpAvamkT55Lp9LqBS0k)
+            bot_token=TOKEN)
 
 
 DEFAULT_START_MESSAGE = """
