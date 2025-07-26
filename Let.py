@@ -789,8 +789,9 @@ async def main():
     await idle()
     await app.stop()
 
+# This should be at the BOTTOM of your Let.py file
 if __name__ == "__main__":
     try:
-        asyncio.run(main())
+        app.run()
     except Exception as e:
-        print(f"❌ An error occurred: {str(e)}")
+        print(f"❌ An error occurred: {e}")
