@@ -778,10 +778,16 @@ async def set_bot_config(client: Client, message: Message):
     await message.reply_text("✅ Config updated, restarting bot...")
     await asyncio.sleep(2)
     os.execv(sys.executable, [sys.executable] + sys.argv)
-
+    
+    async def main():
+    await app.start()
+    await send_startup_message()
+    print("✅ Bot is running...")
+    await idle()
+    await app.stop()
 
 if __name__ == "__main__":
     try:
-        app.run(main())
+        asyncio.run(main())
     except Exception as e:
         print(f"❌ An error occurred: {str(e)}")
