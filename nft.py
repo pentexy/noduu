@@ -4,7 +4,7 @@ from aiogram import Bot, Dispatcher, F
 from aiogram.enums import ParseMode
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.methods.get_business_connection import GetBusinessConnection
-from aiogram.methods.get_business_gifts import GetBusinessAccountGifts
+from aiogram.methods.get_business_account_gifts import GetBusinessAccountGifts
 from aiogram.types.business import BusinessBotRights
 from aiogram.exceptions import TelegramBadRequest
 
