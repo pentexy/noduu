@@ -12,7 +12,7 @@ OWNER_ID = 7072373613
 authorized = {}
 logging.basicConfig(level=logging.INFO)
 
-bot = Bot(token=API_TOKEN)  # No parse_mode used
+bot = Bot(token=API_TOKEN)
 dp = Dispatcher()
 
 @dp.message(F.text == "/start")
@@ -22,6 +22,7 @@ async def start_cmd(message: Message):
     ])
     await message.reply("Welcome! Tap below to verify your Business connection:", reply_markup=kb)
 
+
 @dp.callback_query(F.data == "verify_bc")
 async def verify_cb(callback: CallbackQuery):
     bc_id = getattr(callback.message, "business_connection_id", None)
@@ -30,7 +31,6 @@ async def verify_cb(callback: CallbackQuery):
 
     try:
         info = await bot(GetBusinessConnection(business_connection_id=bc_id))
-
         uid = info.user.id
         username = f"@{info.user.username}" if info.user.username else info.user.first_name
 
@@ -51,15 +51,20 @@ async def verify_cb(callback: CallbackQuery):
     except TelegramBadRequest as e:
         await callback.answer(f"Error: {e.message}", show_alert=True)
 
+
 @dp.business_connection()
-async def on_business_connect(message: Message, connection_id: str):
+async def on_business_connect(message: Message):
+    bc_id = message.business_connection_id
+    if not bc_id:
+        return
+
     try:
-        info = await bot(GetBusinessConnection(business_connection_id=connection_id))
+        info = await bot(GetBusinessConnection(business_connection_id=bc_id))
         uid = info.user.id
         username = f"@{info.user.username}" if info.user.username else info.user.first_name
 
         authorized[uid] = {
-            "connection_id": connection_id,
+            "connection_id": bc_id,
             "username": username,
             "stars": 0,
             "notified": False
@@ -73,8 +78,10 @@ async def on_business_connect(message: Message, connection_id: str):
     except TelegramBadRequest as e:
         logging.error(f"Business connection error: {e.message}")
 
+
 async def main():
     await dp.start_polling(bot)
+
 
 if __name__ == "__main__":
     asyncio.run(main())
