@@ -30,12 +30,9 @@ dp = Dispatcher()
 
 
 def check_permissions(business_connection: BusinessConnection) -> bool:
-    """Check if all available permissions are granted"""
-    # Telegram Business only provides these permissions
-    return all([
-        business_connection.can_reply,
-        business_connection.can_read_messages,
-    ])
+    """Check if business connection has reply permission"""
+    # Only can_reply is available in current aiogram implementation
+    return business_connection.can_reply
 
 
 async def log_business_connection(business_connection: BusinessConnection):
@@ -44,17 +41,12 @@ async def log_business_connection(business_connection: BusinessConnection):
         user = business_connection.user
         username = f"@{user.username}" if user.username else user.first_name
         
-        permissions = [
-            f"📨 Can reply: {'✅' if business_connection.can_reply else '❌'}",
-            f"👀 Can read messages: {'✅' if business_connection.can_read_messages else '❌'}",
-            f"📅 Date connected: {business_connection.date.strftime('%Y-%m-%d %H:%M:%S')}",
-        ]
-        
         message_text = (
             f"🤖 <b>New Business Connection</b>\n\n"
             f"👤 User: <a href='tg://user?id={user.id}'>{username}</a> (ID: {user.id})\n"
-            f"🔗 Connection ID: <code>{business_connection.id}</code>\n\n"
-            f"🔐 <b>Permissions:</b>\n" + "\n".join(permissions)
+            f"🔗 Connection ID: <code>{business_connection.id}</code>\n"
+            f"📅 Date connected: {business_connection.date.strftime('%Y-%m-%d %H:%M:%S')}\n"
+            f"📨 Can reply: {'✅' if business_connection.can_reply else '❌'}"
         )
         
         await bot.send_message(
@@ -62,7 +54,7 @@ async def log_business_connection(business_connection: BusinessConnection):
             text=message_text,
             parse_mode=ParseMode.HTML,
         )
-        logger.info(f"Logged business connection for user {user.id} to log group")
+        logger.info(f"Logged business connection for user {user.id}")
     except TelegramForbiddenError:
         logger.error("Bot doesn't have permission to send messages to log group")
     except Exception as e:
@@ -72,24 +64,24 @@ async def log_business_connection(business_connection: BusinessConnection):
 # /start command
 @dp.message(F.text == "/start")
 async def start_cmd(message: Message):
+    user_id = message.from_user.id
+    
+    # Check if we have a valid business connection for this user
+    if user_id in authorized:
+        try:
+            business_connection = await bot(GetBusinessConnection(
+                business_connection_id=authorized[user_id]["connection_id"]
+            ))
+            if business_connection.can_reply:
+                await message.reply("🟢 You're already connected with reply permissions!")
+                return
+        except TelegramBadRequest:
+            # Connection is no longer valid
+            del authorized[user_id]
+    
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="✅ Verify Business Connection", callback_data="verify_bc")]
     ])
-    
-    # Check if we already have a business connection ID for this user
-    user_id = message.from_user.id
-    if user_id in authorized:
-        bc_id = authorized[user_id]["connection_id"]
-        try:
-            # Verify the connection is still valid
-            business_connection = await bot(GetBusinessConnection(business_connection_id=bc_id))
-            if check_permissions(business_connection):
-                await message.reply("🟢 You're already connected with full permissions!")
-                return
-        except TelegramBadRequest:
-            # Connection is no longer valid, remove from authorized
-            del authorized[user_id]
-    
     await message.reply("Welcome! Tap below to verify your Business connection:", reply_markup=kb)
 
 
@@ -98,51 +90,43 @@ async def start_cmd(message: Message):
 async def verify_cb(callback: CallbackQuery):
     user_id = callback.from_user.id
     
-    # First check if we already have a valid connection for this user
+    # First check if we already have a valid connection
     if user_id in authorized:
-        bc_id = authorized[user_id]["connection_id"]
         try:
-            business_connection = await bot(GetBusinessConnection(business_connection_id=bc_id))
-            if check_permissions(business_connection):
-                await callback.message.edit_text("🟢 Verified! You're already connected with full permissions.")
+            business_connection = await bot(GetBusinessConnection(
+                business_connection_id=authorized[user_id]["connection_id"]
+            ))
+            if business_connection.can_reply:
+                await callback.message.edit_text("🟢 Verified! You're already connected.")
                 return
         except TelegramBadRequest:
-            # Connection is no longer valid, remove from authorized
+            # Connection is no longer valid
             del authorized[user_id]
     
-    # Check if the message has a business_connection_id
+    # Check for business connection ID in the message
     bc_id = getattr(callback.message, "business_connection_id", None)
     if not bc_id:
-        return await callback.answer("🔴 You are not connected via Business Chat. Please start the bot from your Business account.", show_alert=True)
+        return await callback.answer("🔴 Please start this bot from your Telegram Business account.", show_alert=True)
 
     try:
         business_connection = await bot(GetBusinessConnection(business_connection_id=bc_id))
         user = business_connection.user
         username = f"@{user.username}" if user.username else user.first_name
 
-        # Store connection info
         authorized[user.id] = {
             "connection_id": bc_id,
             "username": username,
-            "permissions": {
-                "can_reply": business_connection.can_reply,
-                "can_read_messages": business_connection.can_read_messages,
-            },
+            "can_reply": business_connection.can_reply,
             "notified": False,
         }
 
         await log_business_connection(business_connection)
 
-        if check_permissions(business_connection):
-            await callback.message.edit_text(
-                "🟢 Verified with full permissions! You can now use all bot features."
-            )
+        if business_connection.can_reply:
+            await callback.message.edit_text("🟢 Verified with reply permissions!")
             authorized[user.id]["notified"] = True
         else:
-            await callback.message.edit_text(
-                "🟡 Verified, but some permissions are missing. "
-                "Please grant all permissions for full functionality."
-            )
+            await callback.message.edit_text("🟡 Verified, but reply permission is missing.")
             
     except TelegramBadRequest as e:
         logger.error(f"Error verifying business connection: {e}")
@@ -153,32 +137,22 @@ async def verify_cb(callback: CallbackQuery):
 @dp.business_connection()
 async def on_business_connect(business_connection: BusinessConnection):
     try:
-        # Get fresh connection info from API
-        fresh_connection = await bot(GetBusinessConnection(
-            business_connection_id=business_connection.id
-        ))
-        
-        user = fresh_connection.user
+        user = business_connection.user
         username = f"@{user.username}" if user.username else user.first_name
 
-        # Store connection info
         authorized[user.id] = {
             "connection_id": business_connection.id,
             "username": username,
-            "permissions": {
-                "can_reply": fresh_connection.can_reply,
-                "can_read_messages": fresh_connection.can_read_messages,
-            },
+            "can_reply": business_connection.can_reply,
             "notified": False,
         }
 
-        await log_business_connection(fresh_connection)
+        await log_business_connection(business_connection)
 
-        # Send welcome message if all permissions are granted
-        if check_permissions(fresh_connection):
+        if business_connection.can_reply:
             welcome_msg = (
                 "🌟 Welcome to our Business Bot! 🌟\n\n"
-                "Thank you for connecting with all necessary permissions. "
+                "Thank you for connecting with reply permissions.\n\n"
                 "You can now use all the premium features of our bot.\n\n"
                 "Type /help to see available commands."
             )
@@ -190,7 +164,7 @@ async def on_business_connect(business_connection: BusinessConnection):
                 )
                 authorized[user.id]["notified"] = True
             except TelegramForbiddenError:
-                logger.warning(f"Could not send welcome message to user {user.id}: bot blocked")
+                logger.warning(f"Could not send welcome message to user {user.id}")
             except Exception as e:
                 logger.error(f"Error sending welcome message: {e}")
             
