@@ -3,7 +3,7 @@ import asyncio
 from aiogram import Bot, Dispatcher, F, Router
 from aiogram.enums import ParseMode
 from aiogram.types import Message
-from aiogram.types.business import BusinessConnection
+from aiogram.types import BusinessConnectionData as BusinessConnection
 from aiogram.client.default import DefaultBotSettings
 from aiogram.methods.get_user_gifts import GetUserGifts
 from aiogram.utils.markdown import hlink
