@@ -1,6 +1,6 @@
 import asyncio
-import logging
-from aiogram import Bot, Dispatcher, types
+import logging 
+from aiogram import Bot, Dispatcher, types, F
 from aiogram.enums import ParseMode
 from aiogram.filters import Command
 from aiogram.types import (
