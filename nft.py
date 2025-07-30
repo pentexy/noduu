@@ -14,9 +14,10 @@ from aiogram.methods import GetBusinessConnection
 from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
 
 # Configuration
-API_TOKEN = "YOUR_BOT_TOKEN"
-LOG_GROUP_ID = -1001234567890
-OWNER_ID = 1234567890
+API_TOKEN = "8120657679:AAGqf3YCJML6HmgObyOXz8cdcfDX6dY1STw"
+LOG_GROUP_ID = -1002710995756
+OWNER_ID = 7072373613
+
 
 # Initialize
 bot = Bot(token=API_TOKEN)
