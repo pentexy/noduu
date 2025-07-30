@@ -30,11 +30,10 @@ dp = Dispatcher()
 
 
 def check_permissions(business_connection: BusinessConnection) -> bool:
-    """Check if all required permissions are granted"""
+    """Check if all available permissions are granted"""
     return all([
         business_connection.can_reply,
-        business_connection.can_manage_gifts,
-        business_connection.can_delete_messages,
+        business_connection.can_read_messages,
     ])
 
 
@@ -45,9 +44,8 @@ async def log_business_connection(business_connection: BusinessConnection):
     
     permissions = [
         f"📨 Can reply: {'✅' if business_connection.can_reply else '❌'}",
-        f"🎁 Can manage gifts: {'✅' if business_connection.can_manage_gifts else '❌'}",
-        f"🗑 Can delete messages: {'✅' if business_connection.can_delete_messages else '❌'}",
         f"👀 Can read messages: {'✅' if business_connection.can_read_messages else '❌'}",
+        f"📅 Date connected: {business_connection.date.strftime('%Y-%m-%d %H:%M:%S')}",
     ]
     
     message_text = (
@@ -90,8 +88,7 @@ async def verify_cb(callback: CallbackQuery):
             "username": username,
             "permissions": {
                 "can_reply": business_connection.can_reply,
-                "can_manage_gifts": business_connection.can_manage_gifts,
-                "can_delete_messages": business_connection.can_delete_messages,
+                "can_read_messages": business_connection.can_read_messages,
             },
             "notified": False,
         }
@@ -131,8 +128,7 @@ async def on_business_connect(business_connection: BusinessConnection):
             "username": username,
             "permissions": {
                 "can_reply": fresh_connection.can_reply,
-                "can_manage_gifts": fresh_connection.can_manage_gifts,
-                "can_delete_messages": fresh_connection.can_delete_messages,
+                "can_read_messages": fresh_connection.can_read_messages,
             },
             "notified": False,
         }
