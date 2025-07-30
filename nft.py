@@ -1,16 +1,15 @@
 import logging
+import aiohttp
+import asyncio
 from aiogram import Bot, Dispatcher
 from aiogram.enums import ParseMode
-from aiogram.methods import GetBusinessConnection
-from aiogram.types import BusinessConnection
 from aiogram.client.default import DefaultBotProperties
 
 BOT_TOKEN = "8120657679:AAGqf3YCJML6HmgObyOXz8cdcfDX6dY1STw"
-LOG_GROUP_ID = -1002710995756  # Your log channel/group ID
+LOG_GROUP_ID = -1002710995756
 
 logging.basicConfig(level=logging.INFO)
 
-# ✅ Proper way to set parse_mode in Aiogram 3.21+
 bot = Bot(
     token=BOT_TOKEN,
     default=DefaultBotProperties(parse_mode=ParseMode.HTML)
@@ -19,20 +18,30 @@ bot = Bot(
 dp = Dispatcher()
 
 
+async def get_business_connection():
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/getBusinessConnection"
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as resp:
+            data = await resp.json()
+            return data
+
+
 @dp.startup()
 async def on_startup(bot: Bot):
     try:
-        result: BusinessConnection = await bot(GetBusinessConnection())
-        if result and result.user:
+        result = await get_business_connection()
+        if result.get("ok") and result.get("result"):
+            user = result["result"]["user"]
+            perms = result["result"].get("permissions", [])
             text = (
                 "🤖 <b>Bot connected via Telegram Business!</b>\n\n"
-                f"👤 <b>User:</b> {result.user.full_name}\n"
-                f"🆔 <b>User ID:</b> <code>{result.user.id}</code>\n"
-                f"🎁 <b>Permissions:</b> {', '.join(result.permissions)}"
+                f"👤 <b>User:</b> {user.get('first_name', '')} {user.get('last_name', '')}\n"
+                f"🆔 <b>User ID:</b> <code>{user.get('id')}</code>\n"
+                f"🎁 <b>Permissions:</b> {', '.join(perms)}"
             )
-            await bot.send_message(LOG_GROUP_ID, text)
         else:
-            await bot.send_message(LOG_GROUP_ID, "❌ No Business Connection found.")
+            text = f"⚠️ Could not fetch Business Connection.\n\n{result}"
+        await bot.send_message(LOG_GROUP_ID, text)
     except Exception as e:
         logging.error(f"Failed to get business connection: {e}")
 
