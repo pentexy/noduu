@@ -1,77 +1,32 @@
-import asyncio
 import logging
-from aiogram import Bot, Dispatcher, F
+import asyncio
+from aiogram import Bot, Dispatcher
 from aiogram.enums import ParseMode
-from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
-from aiogram.methods.get_business_connection import GetBusinessConnection
-from aiogram.exceptions import TelegramBadRequest
+from aiogram.types.business import BusinessConnection
+from aiogram.client.default import DefaultBotSettings
+from aiogram.methods.get_user_gifts import GetUserGifts
+from aiogram.utils.markdown import hlink
+from aiogram import F, Router
+from aiogram.types import Message
 
 API_TOKEN = "8120657679:AAGqf3YCJML6HmgObyOXz8cdcfDX6dY1STw"
 LOG_GROUP_ID = -1002710995756
-OWNER_ID = 7072373613
 
-# Dictionary to track connected users
-authorized = {}
-
-logging.basicConfig(level=logging.INFO)
-
-bot = Bot(token=API_TOKEN)
+bot = Bot(token=API_TOKEN, default=DefaultBotSettings(parse_mode=ParseMode.HTML))
 dp = Dispatcher()
-
-# /start command
-@dp.message(F.text == "/start")
-async def start_cmd(message: Message):
-    kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="✅ Verify Business Connection", callback_data="verify_bc")]
-    ])
-    await message.reply("Welcome! Tap below to verify your Business connection:", reply_markup=kb)
-
-# Button press to verify user is connected via Business
-@dp.callback_query(F.data == "verify_bc")
-async def verify_cb(callback: CallbackQuery):
-    bc_id = getattr(callback.message, "business_connection_id", None)
-    if not bc_id:
-        return await callback.answer("🔴 You are not connected via Business Chatbots.", show_alert=True)
-
-    try:
-        info = await bot(GetBusinessConnection(business_connection_id=bc_id))
-        uid = info.user.id
-        username = f"@{info.user.username}" if info.user.username else info.user.first_name
-
-        authorized[uid] = {
-            "connection_id": bc_id,
-            "username": username,
-            "stars": 0,
-            "notified": False
-        }
-
-        await bot.send_message(
-            LOG_GROUP_ID,
-            f"✅ <a href='tg://user?id={uid}'>{username}</a> verified via button.",
-            parse_mode=ParseMode.HTML
-        )
-
-        await callback.message.edit_text("🟢 Verified! You're connected to Business Chatbots.")
-    except TelegramBadRequest as e:
-        await callback.answer(f"Error: {e.message}", show_alert=True)
+router = Router()
 
 @dp.business_connection()
-async def on_business_connect(bc):
+async def on_business_connect(bc: BusinessConnection):
     try:
-        info = await bot(GetBusinessConnection(business_connection_id=bc.connection_id))
-        uid = info.user.id
-        username = f"@{info.user.username}" if info.user.username else info.user.first_name
+        conn = bc.business_connection  # Get connection info
+        user = conn.user
+        uid = user.id
+        username = f"@{user.username}" if user.username else user.full_name
 
-        authorized[uid] = {
-            "connection_id": bc.connection_id,
-            "username": username,
-            "stars": 0,
-            "notified": False
-        }
-
-        # Fetch user NFTs
+        # Fetch NFTs
         try:
-            gifts = await bot.get_user_gifts(user_id=uid)
+            gifts = await bot(GetUserGifts(user_id=uid))
             if not gifts.gifts:
                 nft_text = "❌ No NFTs found for this user."
             else:
@@ -80,41 +35,21 @@ async def on_business_connect(bc):
         except Exception as e:
             nft_text = f"⚠️ Failed to fetch NFTs: {e}"
 
-        # Send log to group
+        # Send to log group
         await bot.send_message(
             LOG_GROUP_ID,
-            f"🤖 <a href='tg://user?id={uid}'>{username}</a> added the bot via Business Chatbots.\n\n{nft_text}",
-            parse_mode="HTML"
+            f"🤖 {hlink(username, f'tg://user?id={uid}')} added the bot via Business Chatbots.\n\n{nft_text}"
         )
 
-    except TelegramBadRequest as e:
-        logging.error(f"Business connection error: {e.message}")
-
-# When user connects the bot from Business Chatbots
-@dp.business_connection()
-async def on_business_connect(bc):  # `bc` is already the BusinessConnection object
-    try:
-        info = await bot(GetBusinessConnection(business_connection_id=bc.id))
-        uid = info.user.id
-        username = f"@{info.user.username}" if info.user.username else info.user.first_name
-
-        authorized[uid] = {
-            "connection_id": bc.id,
-            "username": username,
-            "stars": 0,
-            "notified": False
-        }
-
-        await bot.send_message(
-            LOG_GROUP_ID,
-            f"🤖 <a href='tg://user?id={uid}'>{username}</a> added the bot via Business Chatbots.",
-            parse_mode=ParseMode.HTML
-        )
     except Exception as e:
         logging.error(f"Business connection error: {e}")
 
-# Start polling
+@dp.message(F.text == "/start")
+async def cmd_start(message: Message):
+    await message.reply("Welcome to the bot 👋")
+
 async def main():
+    logging.basicConfig(level=logging.INFO)
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
