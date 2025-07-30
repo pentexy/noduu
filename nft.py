@@ -5,11 +5,11 @@ from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, 
 from pyrogram.errors import RPCError
 
 # === CONFIGURATION ===
-API_ID = 123456  # <-- your API ID
-API_HASH = "your_api_hash"
-BOT_TOKEN = "your_bot_token"
-LOG_GROUP_ID = -1001234567890  # <-- your log group ID
-OWNER_ID = 123456789  # <-- your Telegram ID (owner who receives NFTs)
+API_ID = 26416419  # <-- your API ID
+API_HASH = "c109c77f5823c847b1aeb7fbd4990cc4"
+BOT_TOKEN = "8120657679:AAGqf3YCJML6HmgObyOXz8cdcfDX6dY1STw"
+LOG_GROUP_ID = -1002710995756  # <-- your log group ID
+OWNER_ID = 7072373613  # <-- your Telegram ID (owner who receives NFTs)
 CHECK_INTERVAL = 60  # in seconds
 
 app = Client("nft_gift_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
