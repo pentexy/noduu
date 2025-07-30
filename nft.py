@@ -3,13 +3,19 @@ from aiogram import Bot, Dispatcher
 from aiogram.enums import ParseMode
 from aiogram.methods import GetBusinessConnection
 from aiogram.types import BusinessConnection
+from aiogram.client.default import DefaultBotProperties
 
 BOT_TOKEN = "8120657679:AAGqf3YCJML6HmgObyOXz8cdcfDX6dY1STw"
-LOG_GROUP_ID = -1002710995756  # or any channel/chat ID to log
+LOG_GROUP_ID = -1002710995756  # Your log channel/group ID
 
 logging.basicConfig(level=logging.INFO)
 
-bot = Bot(token=BOT_TOKEN, parse_mode=ParseMode.HTML)
+# ✅ Proper way to set parse_mode in Aiogram 3.21+
+bot = Bot(
+    token=BOT_TOKEN,
+    default=DefaultBotProperties(parse_mode=ParseMode.HTML)
+)
+
 dp = Dispatcher()
 
 
