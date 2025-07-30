@@ -5,7 +5,6 @@ from aiogram.enums import ParseMode
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.methods.get_business_connection import GetBusinessConnection
 from aiogram.exceptions import TelegramBadRequest
-from aiogram.handlers import business_connection
 
 API_TOKEN = "8120657679:AAGqf3YCJML6HmgObyOXz8cdcfDX6dY1STw"
 LOG_GROUP_ID = -1002710995756
