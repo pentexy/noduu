@@ -8,8 +8,7 @@ from pymongo import MongoClient
 API_ID = 26416419
 API_HASH = "c109c77f5823c847b1aeb7fbd4990cc4"
 OWNER_ID = 7339063037
-MONGO_URI = "mongodb+srv://Axxa:Axxay@cluster0.veadsay.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
-DB_NAME = "ton_update_bot"  # 🔧 Replace with your actual database name
+MONGO_URI = "mongodb+srv://sumauyui:BmMk5HpP6Zy4wOsM@cluster0.xvnav2j.mongodb.net/myDatabase?retryWrites=true&w=majority"
 USER_FILE = "cryto_nws"
 
 # Ask BOT_TOKEN in terminal
@@ -20,7 +19,7 @@ bot = Client("ton_update_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_T
 
 # MongoDB setup
 mongo_client = MongoClient(MONGO_URI)
-db = mongo_client[DB_NAME]  # ✅ Fix: Use explicit DB name
+db = mongo_client.get_database()
 users_col = db[USER_FILE]
 
 # /start handler (private only)
@@ -45,7 +44,7 @@ async def start(client, message):
 # Random replies for non-command messages (private only)
 @bot.on_message(filters.private & filters.text & ~filters.command(["start", "owner", "broadcast"]))
 async def random_reply(client, message):
-    replies = ["Hii", "heyy", "Welcome To Our Bot"]
+    replies = ["Hello 👋", "Yo Sir ✨", "Welcome 💎"]
     await message.reply(random.choice(replies))
 
 # Owner panel (private only)
