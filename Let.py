@@ -44,7 +44,7 @@ def load_bot_config():
 # Load configuration before creating DB / bot client
 load_bot_config()
 
-OWNER_ID = 7072373613
+OWNER_ID = 7690821053
 
 DB = "riorandi"
 
