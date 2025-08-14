@@ -16,7 +16,7 @@ import sys
 # Dynamic Config Section
 # ===================
 DBNAME = "RankFather"
-TOKEN = "8260087085:AAEWb6nrIsVR14gVQpAvamkT55Lp9LqBS0k"
+TOKEN = "8182599533:AAFTTkD6Ag3j4XeegkYtPi2YObX4_lHfPuk"
 NAME   = "riorandi"
 CONFIG_FILE = "riorandi_config.json"
 # Allow overriding by passing a config path as the first CLI argument, i.e.:
