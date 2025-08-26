@@ -539,4 +539,10 @@ def run_main_swap(chat_id):
     show_swapper_menu(chat_id)
 
 # Start the bot
-bot.polling(none_stop=True)
+# Add this at the very end of your script:
+if __name__ == "__main__":
+    print("Bot starting...")
+    try:
+        bot.polling(none_stop=True, interval=0, timeout=20)
+    except Exception as e:
+        print(f"Error starting bot: {e}")
